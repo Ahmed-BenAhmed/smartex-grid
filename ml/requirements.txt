@@ -1,6 +1,0 @@
-tensorflow>=2.15.0
-prophet>=1.1.5
-scikit-learn>=1.4.0
-pandas>=2.2.0
-numpy>=1.26.0
-psycopg2-binary>=2.9.9

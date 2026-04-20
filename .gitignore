@@ -1,8 +1,3 @@
-.env
-__pycache__/
-*.pyc
-*.keras
-*.pkl
-ml/models/
-.venv/
-node_modules/
+*
+!README.md
+!.gitignore
