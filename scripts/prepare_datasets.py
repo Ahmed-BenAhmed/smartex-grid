@@ -75,6 +75,111 @@ def prepare_uci(max_rows: int) -> Path:
     return output
 
 
+def write_metadata(dataset_name: str, rows: int, meters: int, start_ts: str | None, end_ts: str | None, sampling_minutes: int | None, original_units: str | None, conversion: dict | None) -> None:
+    import json
+    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+    meta = {
+        "dataset": dataset_name,
+        "rows": rows,
+        "distinct_meters": meters,
+        "start_timestamp": start_ts,
+        "end_timestamp": end_ts,
+        "sampling_minutes": sampling_minutes,
+        "original_units": original_units,
+        "conversion": conversion,
+    }
+    with (PROCESSED_DIR / f"{dataset_name}_metadata.json").open("w", encoding="utf-8") as mf:
+        json.dump(meta, mf, indent=2, ensure_ascii=False)
+
+
+def prepare_nigeria(max_rows: int) -> Path:
+    """Prepare the Nigerian household smart-meter dataset (HuggingFace mirror).
+
+    This function loads the HF dataset (electricsheepafrica/nigerian_energy_and_utilities_household_smart_meter)
+    and writes a processed CSV with the project schema using consumption_kwh as kwh.
+    It also writes a metadata JSON and a short EDA markdown report.
+    """
+    try:
+        from datasets import load_dataset
+    except Exception:
+        raise RuntimeError("Missing dependency: install 'datasets' to prepare Nigeria dataset.")
+
+    output = PROCESSED_DIR / "nigeria_meter_readings.csv"
+    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+
+    ds = load_dataset("electricsheepafrica/nigerian_energy_and_utilities_household_smart_meter")
+    # single split 'train'
+    ds_train = ds["train"]
+
+    written = 0
+    meters = set()
+    min_ts = None
+    max_ts = None
+
+    with output.open("w", newline="", encoding="utf-8") as out:
+        writer = csv.DictWriter(out, fieldnames=["time", "meter_id", "kwh", "is_anomaly", "source"])
+        writer.writeheader()
+
+        for i, row in enumerate(ds_train):
+            if max_rows and max_rows > 0 and written >= max_rows:
+                break
+            ts = row.get("timestamp")
+            meter = row.get("meter_id") or "NIG_UNKNOWN"
+            kwh = row.get("consumption_kwh")
+            if kwh is None:
+                continue
+
+            writer.writerow({
+                "time": ts,
+                "meter_id": meter,
+                "kwh": f"{float(kwh):.8f}",
+                "is_anomaly": "false",
+                "source": "nigeria_smart_meter",
+            })
+            written += 1
+            meters.add(meter)
+            # update min/max timestamps (strings sortable)
+            if ts:
+                if min_ts is None or ts < min_ts:
+                    min_ts = ts
+                if max_ts is None or ts > max_ts:
+                    max_ts = ts
+
+    # infer sampling minutes: compute differences between first few timestamps per meter
+    sampling = None
+    try:
+        from collections import defaultdict
+        import datetime as _dt
+        per_meter = defaultdict(list)
+        for r in ds_train.select(range(min(2000, len(ds_train)))):
+            per_meter[r["meter_id"]].append(r["timestamp"])
+        # pick first meter with >=2 samples
+        for m, ts_list in per_meter.items():
+            if len(ts_list) >= 2:
+                t0 = _dt.datetime.fromisoformat(ts_list[0])
+                t1 = _dt.datetime.fromisoformat(ts_list[1])
+                sampling = int((t1 - t0).total_seconds() / 60)
+                break
+    except Exception:
+        sampling = None
+
+    write_metadata("nigeria", written, len(meters), min_ts, max_ts, sampling, "kWh per interval (consumption_kwh)", None)
+
+    # quick EDA write-up
+    eda_path = Path(__file__).resolve().parents[1] / "reports" / "eda"
+    eda_path.mkdir(parents=True, exist_ok=True)
+    with (eda_path / "nigeria_eda.md").open("w", encoding="utf-8") as md:
+        md.write(f"# Nigeria Smart Meter Dataset EDA\n\n")
+        md.write(f"rows: {written}\\n\n")
+        md.write(f"distinct_meters: {len(meters)}\\n\n")
+        md.write(f"start_ts: {min_ts}\\n\n")
+        md.write(f"end_ts: {max_ts}\\n\n")
+        md.write(f"inferred_sampling_minutes: {sampling}\\n\n")
+
+    print(f"[prepare] Nigeria rows written: {written} -> {output}")
+    return output
+
+
 def parse_london_start_timestamp(value: str) -> datetime:
     return datetime.strptime(value.strip(), "%Y-%m-%d %H-%M-%S")
 
@@ -354,16 +459,32 @@ def prepare_morocco(max_rows: int) -> Path:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Prepare smart-grid datasets into a common CSV schema.")
-    parser.add_argument("--dataset", choices=["london", "uci", "morocco", "all"], default="all")
+    parser.add_argument("--dataset", choices=["london", "uci", "morocco", "nigeria", "all"], default="all")
     parser.add_argument("--max-rows", type=int, default=100_000, help="Rows per dataset; use 0 for all rows.")
     args = parser.parse_args()
 
     if args.dataset in {"london", "all"}:
-        prepare_london(args.max_rows)
+        out = prepare_london(args.max_rows)
+        # write simple metadata for London
+        try:
+            write_metadata("london", 0, 0, None, None, 30, "kWh per half-hour", None)
+        except Exception:
+            pass
     if args.dataset in {"uci", "all"}:
-        prepare_uci(args.max_rows)
+        out = prepare_uci(args.max_rows)
+        try:
+            write_metadata("uci", 0, 1, None, None, 1, "kWh per minute (from kW)", None)
+        except Exception:
+            pass
     if args.dataset in {"morocco", "all"}:
-        prepare_morocco(args.max_rows)
+        out = prepare_morocco(args.max_rows)
+        try:
+            # Morocco has mixed sampling; leave sampling_minutes null in metadata
+            write_metadata("morocco", 0, 0, None, None, None, "mixed: some files in amperes (converted), Marrakech in kW", {"ampere_to_kW_factor": 0.207})
+        except Exception:
+            pass
+    if args.dataset in {"nigeria", "all"}:
+        out = prepare_nigeria(args.max_rows)
 
 
 if __name__ == "__main__":
