@@ -215,96 +215,138 @@ def prepare_morocco(max_rows: int) -> Path:
             "Please install them (pip install pandas openpyxl) and re-run."
         ) from exc
 
+    # Prefer streaming parsing with openpyxl for memory and speed
+    from openpyxl import load_workbook
+    from io import BytesIO
+
     with zipfile.ZipFile(archive) as zf, output.open("w", newline="", encoding="utf-8") as out:
         writer = csv.DictWriter(out, fieldnames=["time", "meter_id", "kwh", "is_anomaly", "source"])
         writer.writeheader()
 
-        # Process each Excel file in the archive
         xlsx_names = [name for name in zf.namelist() if name.lower().endswith(('.xlsx', '.xls'))]
         for xname in xlsx_names:
-            # read into pandas from bytes buffer
             with zf.open(xname) as raw:
                 data = raw.read()
-                from io import BytesIO
                 bio = BytesIO(data)
+                wb = load_workbook(filename=bio, read_only=True, data_only=True)
+                # use first sheet
+                ws = wb[wb.sheetnames[0]]
+                rows = ws.iter_rows(values_only=True)
                 try:
-                    df = pd.read_excel(bio, engine="openpyxl")
-                except Exception:
-                    # Try without specifying engine
-                    bio.seek(0)
-                    df = pd.read_excel(bio)
-
-                # Normalize column names
-                cols = {c: normalize_header(str(c)) for c in df.columns}
-                df.rename(columns=cols, inplace=True)
-
-                # find time column and value columns. Many sheets have a first
-                # column like 'DateTime' and subsequent columns per zone (zone1,
-                # zone2, ...). We'll melt those into the long format expected by
-                # the project: time, meter_id, kwh, is_anomaly, source.
-                time_col = find_column(list(df.columns), ("timestamp", "time", "datetime", "date", "date_time", "datetime"))
-                if not time_col:
+                    header = next(rows)
+                except StopIteration:
                     continue
 
-                # value columns are all columns except the time column
-                value_cols = [c for c in df.columns if c != time_col]
-                if not value_cols:
+                # Normalize header names
+                header_norm = [normalize_header(str(h)) for h in header]
+                # Find time column index (usually first)
+                time_idx = None
+                for i, h in enumerate(header_norm):
+                    if h in ("timestamp", "time", "datetime", "date", "date_time"):
+                        time_idx = i
+                        break
+                if time_idx is None:
+                    time_idx = 0
+
+                value_indices = [i for i in range(len(header_norm)) if i != time_idx]
+                if not value_indices:
                     continue
 
-                # infer sampling minutes from filename (e.g., '30T' or '10T')
-                minutes = None
+                # infer minutes from filename
                 lower_name = xname.lower()
                 if "30t" in lower_name or "30min" in lower_name:
                     minutes = 30
                 elif "10t" in lower_name or "10min" in lower_name:
                     minutes = 10
                 else:
-                    # fallback: try to infer from differences between first two timestamps
+                    # peek two rows to infer sampling interval
                     try:
-                        ts = pd.to_datetime(df[time_col])
-                        if len(ts) >= 2:
-                            minutes = int((ts.iloc[1] - ts.iloc[0]).total_seconds() / 60)
-                    except Exception:
+                        first_row = next(rows)
+                        second_row = next(rows)
+                        import datetime as _dt
+                        t1 = first_row[time_idx]
+                        t2 = second_row[time_idx]
+                        if isinstance(t1, _dt.datetime) and isinstance(t2, _dt.datetime):
+                            minutes = int((t2 - t1).total_seconds() / 60)
+                        else:
+                            minutes = 10
+                        # process the two rows below with a small buffer
+                        buffer_rows = [first_row, second_row]
+                    except StopIteration:
                         minutes = 10
+                        buffer_rows = []
 
                 period_hours = (minutes or 10) / 60.0
 
-                # Melt dataframe: create (time, zone, value)
-                melted = df.melt(id_vars=[time_col], value_vars=value_cols, var_name="zone", value_name="value")
-                # iterate and write rows; assume numeric 'value' is power in kW
-                # so kWh = kW * period_hours. This is documented but should be
-                # verified for correctness.
-                for row_idx, row in melted.iterrows():
-                    k_val = row["value"]
-                    if pd.isna(k_val):
-                        continue
-                    try:
-                        # convert to float and to kWh
-                        k_float = float(k_val)
-                        kwh = k_float * period_hours
-                    except Exception:
-                        # skip non-numeric
-                        continue
+                # Build zone names from header
+                zone_names = [header[i] if i < len(header) else f"zone{i}" for i in value_indices]
 
-                    t_val = row[time_col]
-                    # ensure ISO string for timestamp
-                    try:
-                        t_iso = pd.to_datetime(t_val).isoformat(sep=" ")
-                    except Exception:
-                        t_iso = str(t_val)
+                # Keep original timestamps (10-min for most files, 30-min for Marrakech).
+                # Convert amperes to estimated kW for non-Marrakech files using
+                # Estimated_kW = 230 * I * 0.9 / 1000 = 0.207 * I
+                is_marrakech = "marrakech" in xname.lower()
 
-                    meter_id = f"{Path(xname).stem}_{normalize_header(str(row['zone']))}"
-                    writer.writerow({
-                        "time": t_iso,
-                        "meter_id": meter_id,
-                        "kwh": f"{kwh:.8f}",
-                        "is_anomaly": "false",
-                        "source": "morocco_high_resolution",
-                    })
-                    written += 1
-                    if max_rows and written >= max_rows:
-                        print(f"[prepare] Morocco rows written: {written} -> {output}")
-                        return output
+                # process any buffered rows first
+                for br in locals().get("buffer_rows", []):
+                    row_tuple = br
+                    tcell = row_tuple[time_idx]
+                    for col_i, zone in zip(value_indices, zone_names):
+                        val = row_tuple[col_i]
+                        if val is None:
+                            continue
+                        try:
+                            v = float(val)
+                        except Exception:
+                            continue
+                        if is_marrakech:
+                            kW = v
+                        else:
+                            kW = 0.207 * v
+                        kwh = kW * period_hours
+                        try:
+                            t_iso = tcell.isoformat(sep=" ") if hasattr(tcell, "isoformat") else str(tcell)
+                        except Exception:
+                            t_iso = str(tcell)
+                        meter_id = f"{Path(xname).stem}_{normalize_header(str(zone))}"
+                        writer.writerow({
+                            "time": t_iso,
+                            "meter_id": meter_id,
+                            "kwh": f"{kwh:.8f}",
+                            "is_anomaly": "false",
+                            "source": "morocco_high_resolution",
+                        })
+                        written += 1
+
+                # process remaining rows
+                for row in rows:
+                    row_tuple = row
+                    tcell = row_tuple[time_idx]
+                    for col_i, zone in zip(value_indices, zone_names):
+                        val = row_tuple[col_i]
+                        if val is None:
+                            continue
+                        try:
+                            v = float(val)
+                        except Exception:
+                            continue
+                        if is_marrakech:
+                            kW = v
+                        else:
+                            kW = 0.207 * v
+                        kwh = kW * period_hours
+                        try:
+                            t_iso = tcell.isoformat(sep=" ") if hasattr(tcell, "isoformat") else str(tcell)
+                        except Exception:
+                            t_iso = str(tcell)
+                        meter_id = f"{Path(xname).stem}_{normalize_header(str(zone))}"
+                        writer.writerow({
+                            "time": t_iso,
+                            "meter_id": meter_id,
+                            "kwh": f"{kwh:.8f}",
+                            "is_anomaly": "false",
+                            "source": "morocco_high_resolution",
+                        })
+                        written += 1
 
     print(f"[prepare] Morocco rows written: {written} -> {output}")
     return output
