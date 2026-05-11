@@ -1,0 +1,22 @@
+graph LR
+    subgraph SmartTex["SmartTex (parent project)"]
+        LOOM["Textile Loom\n(sct013 power sensor)"]
+        MQTT["Mosquitto MQTT"]
+        FLINK["Apache Flink\n(EWMA anomaly)"]
+        INFLUX["InfluxDB dashboards"]
+    end
+
+    subgraph SmartGrid["SmartGrid (this project)"]
+        BRIDGE["MQTT-to-Kafka Bridge\n(to be built)"]
+        KAFKA["Kafka\nsmartgrid.meters.raw"]
+        TSDB["TimescaleDB\n+ ML pipeline"]
+        GRAFANA["Grafana\n(unified dashboard)"]
+    end
+
+    LOOM -->|power_watts via MQTT| MQTT
+    MQTT -->|topic bridge| BRIDGE
+    BRIDGE -->|meter_id = loom_id| KAFKA
+    KAFKA --> TSDB
+    TSDB --> GRAFANA
+    INFLUX -.->|add as 2nd datasource| GRAFANA
+    FLINK -.->|real-time alerts| GRAFANA

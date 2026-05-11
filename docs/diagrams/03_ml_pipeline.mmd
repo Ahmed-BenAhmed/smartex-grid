@@ -1,0 +1,24 @@
+flowchart TD
+    A["meter_daily\n(TimescaleDB)"] -->|last 30 days\n96 time slots x meters| B
+
+    B["clustering.py\nK-Means k=5\nStandardScaler"]
+    B -->|cluster_id per meter| C["meters table\ncluster_id updated"]
+
+    C --> D["For each cluster 0..4"]
+
+    D --> E["lstm_model.py\nLoad 90-day history\nper cluster"]
+    D --> F["prophet_model.py\nLoad meter_daily aggregates\nper cluster"]
+
+    E --> E1["Window: 96 ticks lookback\nadaptive 48-288 based on volatility\nHorizon: 4 ticks = 1h"]
+    E1 --> E2["LSTM(64) --> LSTM(32) --> Dense(4)\n20 epochs, batch 32"]
+    E2 --> E3["models/lstm_cluster_id.keras"]
+
+    F --> F1["daily_seasonality=True\nweekly + yearly seasonality\nForecast: 7 days ahead"]
+    F1 --> F2["models/prophet_cluster_id.pkl"]
+
+    E3 --> G["meter_predictions table\n(kwh_pred, kwh_lower, kwh_upper)"]
+    F2 --> G
+
+    G --> H["anomaly_detector.py\nActual vs Predicted\nZ-score > 3sigma anomaly_events"]
+
+    I["incremental_train.py\n(runs daily)"] -->|last 24h data per cluster| E2

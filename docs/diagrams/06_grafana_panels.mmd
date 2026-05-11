@@ -1,0 +1,9 @@
+graph TD
+    DB["TimescaleDB"]
+    PROM["Prometheus"]
+
+    DB -->|"SELECT time_bucket('1h', time), sum(kwh)\nFROM meter_readings"| P1["Panel 1\nTotal Grid Consumption\n(time series)"]
+    DB -->|"SELECT detected_at, meter_id, severity\nFROM anomaly_events ORDER BY detected_at DESC"| P2["Panel 2\nAnomaly Events\n(table)"]
+    DB -->|"SELECT cluster_id, sum(kwh_total)\nFROM meter_daily JOIN meters"| P3["Panel 3\nConsumption by Cluster\n(bar chart)"]
+    DB -->|"SELECT time, kwh_pred, kwh_lower, kwh_upper\nFROM meter_predictions\nJOIN meter_readings"| P4["Panel 4\nForecast vs Actual\n(overlay time series)"]
+    PROM --> P5["Panel 5\nInfra Metrics\n(up/down, scrape latency)"]

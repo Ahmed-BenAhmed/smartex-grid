@@ -1,0 +1,25 @@
+sequenceDiagram
+    participant SIM as meter_simulator.py
+    participant KAFKA as Kafka
+    participant K2T as kafka_to_timescale.py
+    participant DB as TimescaleDB
+    participant AGG as Continuous Aggregates
+    participant DETECT as anomaly_detector.py
+    participant GRAF as Grafana
+
+    loop Every 15 minutes
+        SIM->>KAFKA: publish JSON {timestamp, meter_id, kwh, is_anomaly}
+        KAFKA->>K2T: consume batch (up to 10 MB)
+        K2T->>DB: INSERT INTO meter_readings ON CONFLICT DO NOTHING
+        DB->>AGG: auto-refresh meter_hourly (every 30 min)
+        DB->>AGG: auto-refresh meter_daily (every 1 hour)
+    end
+
+    loop Every hour
+        DETECT->>DB: SELECT meter_readings JOIN meter_predictions (last 1h)
+        DETECT->>DETECT: compute residuals + rolling Z-score (96-pt window)
+        DETECT->>DB: INSERT INTO anomaly_events (severity: low/medium/high)
+    end
+
+    GRAF->>DB: SQL queries (TimescaleDB datasource)
+    GRAF->>GRAF: render 4 dashboard panels

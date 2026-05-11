@@ -1,0 +1,29 @@
+graph LR
+    subgraph Docker["docker-compose stack"]
+        direction TB
+        TSDB["TimescaleDB\nPostgreSQL 16\n:5432\nVol: timescale_data"]
+        ZK["Zookeeper\n:2181"]
+        BROKER["Kafka Broker\n:9092\nConfluentCP 7.6"]
+        KAFUI["Kafka UI\n:8080"]
+        PROM["Prometheus\n:9091\nVol: prometheus_data"]
+        GRAF["Grafana 11.3\n:3001\nVol: grafana_data"]
+    end
+
+    subgraph Host["Host / Local Python processes"]
+        SIM["meter_simulator.py"]
+        K2T["kafka_to_timescale.py"]
+        ML["ml/ scripts"]
+        SCRIPTS["scripts/ (EDA, prepare)"]
+    end
+
+    ZK --> BROKER
+    BROKER --> KAFUI
+    SIM -->|produce| BROKER
+    BROKER -->|consume| K2T
+    K2T -->|INSERT| TSDB
+    ML -->|READ / WRITE| TSDB
+    SCRIPTS -->|READ / WRITE| TSDB
+    TSDB -->|SQL datasource| GRAF
+    PROM -->|metrics datasource| GRAF
+    PROM -->|scrape :9092| BROKER
+    PROM -->|scrape :5432| TSDB

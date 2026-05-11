@@ -1,0 +1,60 @@
+erDiagram
+    meters {
+        text meter_id PK
+        int cluster_id
+        text profile
+        text location
+        float lat
+        float lon
+    }
+
+    meter_readings {
+        timestamptz time PK
+        text meter_id PK
+        float kwh
+        bool is_anomaly
+    }
+
+    meter_hourly {
+        timestamptz bucket
+        text meter_id
+        float kwh_total
+        float kwh_avg
+        float kwh_max
+        int reading_count
+    }
+
+    meter_daily {
+        timestamptz bucket
+        text meter_id
+        float kwh_total
+        float kwh_avg
+        float kwh_peak
+        int anomaly_count
+    }
+
+    meter_predictions {
+        timestamptz time
+        text meter_id
+        text model
+        float kwh_pred
+        float kwh_lower
+        float kwh_upper
+    }
+
+    anomaly_events {
+        timestamptz detected_at
+        text meter_id
+        timestamptz reading_time
+        float kwh_actual
+        float kwh_expected
+        float deviation
+        text severity
+    }
+
+    meters ||--o{ meter_readings : "has readings"
+    meters ||--o{ meter_predictions : "has forecasts"
+    meters ||--o{ anomaly_events : "has anomalies"
+    meter_readings ||--o{ meter_hourly : "rolls up to"
+    meter_readings ||--o{ meter_daily : "rolls up to"
+    meter_predictions ||--o{ anomaly_events : "compared against"

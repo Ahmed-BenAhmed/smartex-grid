@@ -1,0 +1,55 @@
+graph TB
+    subgraph Sources["Data Sources"]
+        SIM["meter_simulator.py\n(15-min synthetic readings)"]
+        CSV["Historical CSVs\n(London / UCI datasets)"]
+    end
+
+    subgraph Ingestion["Ingestion Layer"]
+        KAFKA["Kafka\ntopic: smartgrid.meters.raw"]
+        K2T["kafka_to_timescale.py\n(real-time consumer)"]
+        LOADER["load_csv_to_timescale.py\n(batch loader)"]
+        KAFKAUI["Kafka UI :8080"]
+    end
+
+    subgraph Warehouse["Data Warehouse — TimescaleDB :5432"]
+        RAW["meter_readings\n(hypertable, 15-min)"]
+        AGG1["meter_hourly\n(continuous aggregate)"]
+        AGG2["meter_daily\n(continuous aggregate)"]
+        PRED["meter_predictions\n(LSTM / Prophet forecasts)"]
+        ANOM["anomaly_events\n(detected spikes)"]
+        META["meters\n(metadata + cluster_id)"]
+    end
+
+    subgraph ML["ML Pipeline"]
+        CLUST["clustering.py\n(K-Means, 5 clusters)"]
+        LSTM["lstm_model.py\n(LSTM per cluster)"]
+        PROPHET["prophet_model.py\n(Prophet per cluster)"]
+        DETECT["anomaly_detector.py\n(Z-score on residuals)"]
+        INCR["incremental_train.py\n(daily re-fit)"]
+    end
+
+    subgraph Monitoring["Monitoring & Dashboards"]
+        GRAFANA["Grafana :3001\n(Load Map dashboard)"]
+        PROM["Prometheus :9091\n(infra metrics)"]
+    end
+
+    SIM -->|JSON stream| KAFKA
+    KAFKA --> K2T
+    KAFKA --> KAFKAUI
+    K2T --> RAW
+    CSV --> LOADER --> RAW
+
+    RAW --> AGG1
+    RAW --> AGG2
+    AGG2 --> CLUST --> META
+    RAW --> LSTM --> PRED
+    RAW --> PROPHET --> PRED
+    PRED --> DETECT --> ANOM
+
+    RAW --> INCR
+
+    RAW --> GRAFANA
+    PRED --> GRAFANA
+    ANOM --> GRAFANA
+    AGG1 --> GRAFANA
+    PROM --> GRAFANA
