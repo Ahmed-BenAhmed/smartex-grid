@@ -31,6 +31,17 @@ $UciUrl = "https://archive.ics.uci.edu/static/public/235/individual+household+el
 $UciOut = Join-Path $RawDir "individual_household_electric_power_consumption.zip"
 Download-IfMissing -Url $UciUrl -OutFile $UciOut
 
+# UCI Morocco high-resolution smart-meter dataset (archive may be Excel/CSV)
+$MoroccoUrl = "https://archive.ics.uci.edu/dataset/1158/high-resolution+load+dataset+from+smart+meters+across+various+cities+in+morocco"
+$MoroccoOut = Join-Path $RawDir "morocco_high_resolution_smart_meters.zip"
+Write-Host "[data] Note: the Morocco dataset page may require manual download or direct link retrieval."
+Write-Host "       If the automatic download fails, visit: https://archive.ics.uci.edu/dataset/1158"
+try {
+    Download-IfMissing -Url $MoroccoUrl -OutFile $MoroccoOut
+} catch {
+    Write-Host "[data] Morocco dataset could not be downloaded automatically. Please download the archive from the UCI page and place it at: $MoroccoOut"
+}
+
 if ($IncludeRefit) {
     Write-Host "[data] REFIT requires using the Strathclyde dataset page if the direct file URL changes:"
     Write-Host "       https://pureportal.strath.ac.uk/en/datasets/refit-electrical-load-measurements/"

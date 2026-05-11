@@ -12,6 +12,14 @@ This project uses one main smart-meter dataset and one lightweight validation da
 - Coverage: 5,560 household time series, November 2011 to February 2014
 - Role: primary dataset for clustering, forecasting, hourly/daily warehouse aggregates, and Grafana dashboards.
 
+### Morocco High-Resolution Smart Meters (UCI)
+
+- Source: https://archive.ics.uci.edu/dataset/1158/high-resolution+load+dataset+from+smart+meters+across+various+cities+in+morocco
+- Size: ~21 MB (Data Morocco.xlsx in UCI archive) — may vary depending on the archive
+- Granularity: mixed (10 minutes for some cities, 30 minutes for others)
+- Coverage: Laâyoune, Boujdour, Marrakech, Foum Eloued — domestic and industrial profiles
+- Role: recommended primary dataset for projects targeting Morocco; can be resampled to 15-min, hourly, and daily granularities.
+
 ## Test Dataset
 
 ### UCI Individual Household Electric Power Consumption
