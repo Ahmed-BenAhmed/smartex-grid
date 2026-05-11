@@ -20,6 +20,14 @@ This project uses one main smart-meter dataset and one lightweight validation da
 - Coverage: Laâyoune, Boujdour, Marrakech, Foum Eloued — domestic and industrial profiles
 - Role: recommended primary dataset for projects targeting Morocco; can be resampled to 15-min, hourly, and daily granularities.
 
+### Nigeria Energy & Utilities Household Smart Meter
+
+- Source: https://huggingface.co/datasets/electricsheepafrica/nigerian_energy_and_utilities_household_smart_meter
+- Size: 200,000 rows
+- Granularity: hourly in the current mirror
+- Coverage: 10 DisCos, feeder-level and tariff-band metadata
+- Role: secondary African dataset for validation, clustering, tariff analysis, and anomaly experiments.
+
 ## Test Dataset
 
 ### UCI Individual Household Electric Power Consumption
@@ -51,3 +59,8 @@ time,meter_id,kwh,is_anomaly,source
 ```
 
 The `is_anomaly` field is initialized to `false` for public datasets without labels. The ML pipeline can later populate anomaly events from residuals or statistical rules.
+
+## Conversion Assumptions
+
+- Morocco non-Marrakech files are converted from amperes to estimated kW using `Estimated_kW = 230 × I × 0.9 / 1000 = 0.207 × I`.
+- This is an approximation and should be revisited if more precise voltage or power-factor metadata becomes available.

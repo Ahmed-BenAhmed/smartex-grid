@@ -75,13 +75,14 @@ def main() -> None:
     parser.add_argument(
         "files",
         nargs="*",
-        default=[
-            str(ROOT / "data" / "processed" / "london_meter_readings.csv"),
-            str(ROOT / "data" / "processed" / "uci_meter_readings.csv"),
-        ],
+        default=None,
     )
     parser.add_argument("--batch-size", type=int, default=10_000)
     args = parser.parse_args()
+
+    if args.files is None:
+        processed_dir = ROOT / "data" / "processed"
+        args.files = sorted(str(p) for p in processed_dir.glob("*_meter_readings.csv"))
 
     with psycopg2.connect(PG_DSN) as conn:
         for file_arg in args.files:

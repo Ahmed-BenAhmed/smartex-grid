@@ -92,6 +92,51 @@ def write_metadata(dataset_name: str, rows: int, meters: int, start_ts: str | No
         json.dump(meta, mf, indent=2, ensure_ascii=False)
 
 
+def summarize_csv(path: Path) -> dict:
+    import csv as _csv
+    import datetime as _dt
+
+    rows = 0
+    meters = set()
+    min_ts = None
+    max_ts = None
+    first_meter_times: dict[str, list[_dt.datetime]] = {}
+
+    with path.open("r", newline="", encoding="utf-8") as f:
+        reader = _csv.DictReader(f)
+        for row in reader:
+            rows += 1
+            meter = row.get("meter_id") or ""
+            ts = row.get("time") or ""
+            meters.add(meter)
+            if ts:
+                if min_ts is None or ts < min_ts:
+                    min_ts = ts
+                if max_ts is None or ts > max_ts:
+                    max_ts = ts
+                if meter not in first_meter_times:
+                    first_meter_times[meter] = []
+                if len(first_meter_times[meter]) < 3:
+                    try:
+                        first_meter_times[meter].append(_dt.datetime.fromisoformat(ts))
+                    except Exception:
+                        pass
+
+    sampling_minutes = None
+    for ts_list in first_meter_times.values():
+        if len(ts_list) >= 2:
+            sampling_minutes = int((ts_list[1] - ts_list[0]).total_seconds() / 60)
+            break
+
+    return {
+        "rows": rows,
+        "distinct_meters": len(meters),
+        "start_timestamp": min_ts,
+        "end_timestamp": max_ts,
+        "sampling_minutes": sampling_minutes,
+    }
+
+
 def prepare_nigeria(max_rows: int) -> Path:
     """Prepare the Nigerian household smart-meter dataset (HuggingFace mirror).
 
@@ -169,12 +214,12 @@ def prepare_nigeria(max_rows: int) -> Path:
     eda_path = Path(__file__).resolve().parents[1] / "reports" / "eda"
     eda_path.mkdir(parents=True, exist_ok=True)
     with (eda_path / "nigeria_eda.md").open("w", encoding="utf-8") as md:
-        md.write(f"# Nigeria Smart Meter Dataset EDA\n\n")
-        md.write(f"rows: {written}\\n\n")
-        md.write(f"distinct_meters: {len(meters)}\\n\n")
-        md.write(f"start_ts: {min_ts}\\n\n")
-        md.write(f"end_ts: {max_ts}\\n\n")
-        md.write(f"inferred_sampling_minutes: {sampling}\\n\n")
+        md.write("# Nigeria Smart Meter Dataset EDA\n\n")
+        md.write(f"rows: {written}\n\n")
+        md.write(f"distinct_meters: {len(meters)}\n\n")
+        md.write(f"start_ts: {min_ts}\n\n")
+        md.write(f"end_ts: {max_ts}\n\n")
+        md.write(f"inferred_sampling_minutes: {sampling}\n\n")
 
     print(f"[prepare] Nigeria rows written: {written} -> {output}")
     return output
@@ -465,22 +510,23 @@ def main() -> None:
 
     if args.dataset in {"london", "all"}:
         out = prepare_london(args.max_rows)
-        # write simple metadata for London
         try:
-            write_metadata("london", 0, 0, None, None, 30, "kWh per half-hour", None)
+            meta = summarize_csv(out)
+            write_metadata("london", meta["rows"], meta["distinct_meters"], meta["start_timestamp"], meta["end_timestamp"], meta["sampling_minutes"] or 30, "kWh per half-hour", None)
         except Exception:
             pass
     if args.dataset in {"uci", "all"}:
         out = prepare_uci(args.max_rows)
         try:
-            write_metadata("uci", 0, 1, None, None, 1, "kWh per minute (from kW)", None)
+            meta = summarize_csv(out)
+            write_metadata("uci", meta["rows"], meta["distinct_meters"], meta["start_timestamp"], meta["end_timestamp"], meta["sampling_minutes"] or 1, "kWh per minute (from kW)", None)
         except Exception:
             pass
     if args.dataset in {"morocco", "all"}:
         out = prepare_morocco(args.max_rows)
         try:
-            # Morocco has mixed sampling; leave sampling_minutes null in metadata
-            write_metadata("morocco", 0, 0, None, None, None, "mixed: some files in amperes (converted), Marrakech in kW", {"ampere_to_kW_factor": 0.207})
+            meta = summarize_csv(out)
+            write_metadata("morocco", meta["rows"], meta["distinct_meters"], meta["start_timestamp"], meta["end_timestamp"], meta["sampling_minutes"], "mixed: some files in amperes (converted), Marrakech in kW", {"ampere_to_kW_factor": 0.207})
         except Exception:
             pass
     if args.dataset in {"nigeria", "all"}:
