@@ -1,3 +1,9 @@
-*
-!README.md
-!.gitignore
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Downloaded/generated datasets
+data/raw/
+data/processed/

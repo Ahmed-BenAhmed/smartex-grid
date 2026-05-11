@@ -57,6 +57,31 @@ make train-prophet CLUSTER=0
 make detect
 ```
 
+## Datasets
+
+The project starts with the cleaned London Smart Meters dataset from Zenodo
+as the main dataset, then uses the UCI household power dataset as a small
+test/anomaly-development dataset.
+
+```bash
+make download-data
+make prepare-data
+make load-data
+```
+
+This creates local files under `data/raw/` and `data/processed/`. These files
+are intentionally ignored by Git because the downloaded datasets are large.
+
+See `data/README.md` for source links, sizes, and the optional REFIT dataset.
+
+Generate EDA reports for London, UCI, and their merged version:
+
+```bash
+make eda
+```
+
+Reports and figures are written under `reports/eda/`.
+
 **Grafana:** http://localhost:3001
 **Kafka UI:** http://localhost:8080
 **Prometheus:** http://localhost:9091
