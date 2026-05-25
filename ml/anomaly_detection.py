@@ -32,9 +32,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from statistics import median
 from typing import Dict, List, Tuple
-
-import numpy as np
 
 try:
     from sklearn.ensemble import IsolationForest
@@ -42,7 +41,7 @@ except Exception:
     IsolationForest = None  # optional
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 MODEL_READY_DIR = ROOT / "data" / "model_ready"
 
 
@@ -50,6 +49,7 @@ MODEL_READY_DIR = ROOT / "data" / "model_ready"
 class AnomalyConfig:
     window: int = 24  # rolling window in samples (e.g., 24 hours)
     mad_multiplier: float = 3.5  # threshold multiplier for robust z-score
+    min_abs_deviation: float = 0.0  # guardrail against tiny deviations with tiny MAD
     min_samples_iforest: int = 100  # min samples per group to run IsolationForest
     iforest_contamination: float = 0.01  # contamination param for IsolationForest
 
@@ -60,27 +60,56 @@ def parse_timestamp(value: str) -> datetime:
     return datetime.fromisoformat(value)
 
 
+def infer_cadence_minutes(times: List[datetime]) -> int:
+    deltas = []
+    for prev, cur in zip(times, times[1:]):
+        minutes = int((cur - prev).total_seconds() // 60)
+        if minutes > 0:
+            deltas.append(minutes)
+    return int(median(deltas)) if deltas else 60
+
+
 def rolling_median_mad_anomalies(values: List[float], cfg: AnomalyConfig) -> List[bool]:
     """Return list of booleans marking anomalies based on rolling median+MAD robust z-score.
 
     The implementation returns False for the first `window` samples (not enough history).
     """
-    arr = np.asarray(values, dtype=float)
+    arr = [float(v) for v in values]
     n = len(arr)
     is_anom = [False] * n
     w = cfg.window
 
     for i in range(w, n):
         window_vals = arr[i - w : i]
-        med = np.median(window_vals)
-        mad = np.median(np.abs(window_vals - med))
+        med = median(window_vals)
+        mad = median([abs(v - med) for v in window_vals])
         # Prevent division by zero
         denom = mad if mad > 0 else 1e-9
-        robust_z = (arr[i] - med) / denom
-        if abs(robust_z) > cfg.mad_multiplier:
+        deviation = abs(arr[i] - med)
+        robust_z = deviation / denom
+        if robust_z > cfg.mad_multiplier and deviation >= cfg.min_abs_deviation:
             is_anom[i] = True
 
     return is_anom
+
+
+def seasonal_residual_anomalies(times: List[datetime], values: List[float], cfg: AnomalyConfig) -> List[bool]:
+    """Detect contextual anomalies using residuals vs same historical time slot.
+
+    Prefer the same slot from the previous week when enough data exists; this
+    avoids flagging normal weekday/weekend level differences as anomalies.
+    """
+    if len(values) < cfg.window * 2:
+        return [False] * len(values)
+    cadence = infer_cadence_minutes(times)
+    daily_steps = max(1, int((24 * 60) / cadence))
+    weekly_steps = daily_steps * 7
+    season_steps = weekly_steps if len(values) >= weekly_steps + cfg.window else daily_steps
+    residuals = [0.0] * len(values)
+    for idx in range(season_steps, len(values)):
+        residuals[idx] = float(values[idx]) - float(values[idx - season_steps])
+    flags = rolling_median_mad_anomalies(residuals, cfg)
+    return [idx >= season_steps and flag for idx, flag in enumerate(flags)]
 
 
 def isolation_forest_anomalies(values: List[float], cfg: AnomalyConfig) -> List[bool]:
@@ -90,6 +119,11 @@ def isolation_forest_anomalies(values: List[float], cfg: AnomalyConfig) -> List[
     if len(values) < cfg.min_samples_iforest:
         return [False] * len(values)
 
+    try:
+        import numpy as np
+    except Exception:
+        return [False] * len(values)
+
     model = IsolationForest(contamination=cfg.iforest_contamination, random_state=42)
     X = np.array(values).reshape(-1, 1)
     preds = model.fit_predict(X)
@@ -97,7 +131,12 @@ def isolation_forest_anomalies(values: List[float], cfg: AnomalyConfig) -> List[
     return [p == -1 for p in preds.tolist()]
 
 
-def detect_anomalies_in_file(path: Path, cfg: AnomalyConfig, group_by: str = "meter_id") -> Tuple[Path, Path]:
+def detect_anomalies_in_file(
+    path: Path,
+    cfg: AnomalyConfig,
+    group_by: str = "meter_id",
+    preserve_existing: bool = False,
+) -> Tuple[Path, Path]:
     """Detect anomalies in a model-ready CSV.
 
     group_by: column name to group by; defaults to 'meter_id'. Other natural groups
@@ -121,32 +160,37 @@ def detect_anomalies_in_file(path: Path, cfg: AnomalyConfig, group_by: str = "me
             key = row.get(group_by) or row.get("meter_id")
             groups[key].append((row["time"], kwh, idx))
 
-    # Placeholder for marking anomalies
-    is_anomaly_flags = [row.get("is_anomaly", "false").strip().lower() in ("1", "true", "yes") for row in rows]
+    if preserve_existing:
+        is_anomaly_flags = [row.get("is_anomaly", "false").strip().lower() in ("1", "true", "yes") for row in rows]
+    else:
+        is_anomaly_flags = [False] * len(rows)
 
     report: Dict[str, Dict[str, int]] = {}
 
     for key, series in groups.items():
         # Sort by time to ensure temporal order
         series_sorted = sorted(series, key=lambda x: x[0])
-        times, values, indices = zip(*series_sorted)
+        time_strings, values, indices = zip(*series_sorted)
+        times = [parse_timestamp(value) for value in time_strings]
 
-        # Rolling MAD detector
-        mad_flags = rolling_median_mad_anomalies(list(values), cfg)
+        # Seasonal residual detector catches consumption anomalies without
+        # treating normal daily peaks as anomalous raw values.
+        seasonal_flags = seasonal_residual_anomalies(times, list(values), cfg)
 
         # Optional IsolationForest
         iforest_flags = isolation_forest_anomalies(list(values), cfg)
 
-        combined = [m or i for m, i in zip(mad_flags, iforest_flags)]
+        combined = [s or i for s, i in zip(seasonal_flags, iforest_flags)]
 
         # Apply to global flags
-        applied = 0
-        for t, flag, idx in zip(times, combined, indices):
+        detected = 0
+        for _t, flag, idx in zip(times, combined, indices):
             if flag and not is_anomaly_flags[idx]:
                 is_anomaly_flags[idx] = True
-                applied += 1
+            if flag:
+                detected += 1
 
-        report[key] = {"samples": len(values), "detected": applied}
+        report[key] = {"samples": len(values), "detected": detected}
 
     # Write output CSV with updated is_anomaly column
     fieldnames = list(rows[0].keys()) if rows else ["time", "meter_id", "kwh", "is_anomaly", "source"]
@@ -170,9 +214,12 @@ def main() -> None:
     parser.add_argument("files", nargs="*", help="CSV files to analyze. Defaults to all *_m.csv files in data/model_ready.")
     parser.add_argument("--group-by", type=str, default="meter_id", help="Column name to group by (city/zone/disco/feeder_id/meter_id)")
     parser.add_argument("--window", type=int, default=24, help="Rolling window size in samples for robust stats")
+    parser.add_argument("--mad-multiplier", type=float, default=3.5, help="Robust MAD threshold multiplier")
+    parser.add_argument("--min-abs-deviation", type=float, default=0.0, help="Minimum absolute deviation required for MAD flags")
+    parser.add_argument("--preserve-existing", action="store_true", help="Keep existing is_anomaly=true labels in output")
     args = parser.parse_args()
 
-    cfg = AnomalyConfig(window=args.window)
+    cfg = AnomalyConfig(window=args.window, mad_multiplier=args.mad_multiplier, min_abs_deviation=args.min_abs_deviation)
 
     if args.files:
         files = [Path(f) if Path(f).is_absolute() else ROOT / f for f in args.files]
@@ -184,7 +231,7 @@ def main() -> None:
 
     for path in files:
         try:
-            detect_anomalies_in_file(path, cfg, group_by=args.group_by)
+            detect_anomalies_in_file(path, cfg, group_by=args.group_by, preserve_existing=args.preserve_existing)
         except Exception as exc:
             print(f"[error] {path}: {exc}")
 

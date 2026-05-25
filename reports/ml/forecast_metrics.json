@@ -1,0 +1,38 @@
+{
+  "input_file": "data/model_ready/demo_meter_readings_60m.csv",
+  "group_by": "meter_id",
+  "model_requested": "seasonal_naive",
+  "horizon_hours": 24,
+  "groups": [
+    {
+      "group_key": "DEMO_METER_A",
+      "samples": 504,
+      "cadence_minutes": 60,
+      "horizon_hours": 24,
+      "horizon_steps": 24,
+      "folds_requested": 5,
+      "folds_used": 5,
+      "model_type": "seasonal_naive_fallback",
+      "wape_1_step": 0.08753757354512416,
+      "wape_horizon": 0.11870761662515342
+    },
+    {
+      "group_key": "DEMO_METER_B",
+      "samples": 504,
+      "cadence_minutes": 60,
+      "horizon_hours": 24,
+      "horizon_steps": 24,
+      "folds_requested": 5,
+      "folds_used": 5,
+      "model_type": "seasonal_naive_fallback",
+      "wape_1_step": 0.08608346632963715,
+      "wape_horizon": 0.11648090987928912
+    }
+  ],
+  "overall": {
+    "groups": 2,
+    "forecast_rows": 240,
+    "wape_1_step": 0.08673118315052113,
+    "wape_horizon": 0.11747044543697845
+  }
+}

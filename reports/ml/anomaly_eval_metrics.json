@@ -1,0 +1,47 @@
+{
+  "input_file": "data/model_ready/demo_meter_readings_60m_injected.csv",
+  "prediction_file": "data/model_ready/demo_meter_readings_60m_injected_anomalies.csv",
+  "detector_report": "data/model_ready/demo_meter_readings_60m_injected_anomalies_report.json",
+  "group_by": "meter_id",
+  "window": 24,
+  "mad_multiplier": 3.5,
+  "min_abs_deviation": 0.12,
+  "tolerance_steps": 2,
+  "overall": {
+    "tp": 27,
+    "fp": 0,
+    "fn": 16,
+    "tn": 965,
+    "precision": 1.0,
+    "recall": 0.627906976744186,
+    "f1": 0.7714285714285715
+  },
+  "groups": {
+    "DEMO_METER_A": {
+      "tp": 11,
+      "fp": 0,
+      "fn": 11,
+      "tn": 482,
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1": 0.6666666666666666,
+      "windows": 5,
+      "missed_windows": 0,
+      "avg_latency_samples": 1.2,
+      "avg_latency_minutes": 72.0
+    },
+    "DEMO_METER_B": {
+      "tp": 16,
+      "fp": 0,
+      "fn": 5,
+      "tn": 483,
+      "precision": 1.0,
+      "recall": 0.7619047619047619,
+      "f1": 0.8648648648648648,
+      "windows": 4,
+      "missed_windows": 0,
+      "avg_latency_samples": 0.75,
+      "avg_latency_minutes": 45.0
+    }
+  }
+}

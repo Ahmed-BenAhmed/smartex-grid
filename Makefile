@@ -1,4 +1,10 @@
-.PHONY: up down logs simulate ingest cluster train-lstm train-prophet detect download-data prepare-data load-data eda resample-model
+.PHONY: up down logs simulate ingest cluster train-lstm train-prophet detect download-data prepare-data load-data eda resample-model demo-data train-prophet-csv inject-anomalies eval-anomalies ml-demo test
+
+MODEL_FILE ?= data/model_ready/demo_meter_readings_60m.csv
+INJECTED_FILE ?= data/model_ready/demo_meter_readings_60m_injected.csv
+GROUP_BY ?= meter_id
+FREQ_MINUTES ?= 60
+HORIZON_HOURS ?= 24
 
 up:
 	docker compose up -d
@@ -46,4 +52,22 @@ eda:
 	python scripts/generate_eda.py --max-rows 500000
 
 resample-model:
-	python scripts/resample_for_model.py --freq-minutes 60
+	python scripts/resample_for_model.py --freq-minutes $(FREQ_MINUTES)
+
+demo-data:
+	python scripts/generate_demo_data.py --out data/processed/demo_meter_readings.csv
+	python scripts/resample_for_model.py data/processed/demo_meter_readings.csv --freq-minutes 60
+
+train-prophet-csv:
+	python ml/train_prophet.py $(MODEL_FILE) --group-by $(GROUP_BY) --horizon-hours $(HORIZON_HOURS) --model seasonal_naive
+
+inject-anomalies:
+	python ml/inject_anomalies.py $(MODEL_FILE) --out $(INJECTED_FILE) --group-by $(GROUP_BY)
+
+eval-anomalies:
+	python ml/eval_anomaly_detection.py $(INJECTED_FILE) --group-by $(GROUP_BY)
+
+ml-demo: demo-data train-prophet-csv inject-anomalies eval-anomalies
+
+test:
+	python -m unittest discover -s tests
