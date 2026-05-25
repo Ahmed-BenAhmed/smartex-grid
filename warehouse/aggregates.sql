@@ -3,6 +3,10 @@
 -- Run after initial data load to populate continuous aggregates
 -- ============================================================
 
+-- Backfill 15-minute aggregate for last 30 days
+CALL refresh_continuous_aggregate('meter_15min',
+    NOW() - INTERVAL '30 days', NOW());
+
 -- Backfill hourly aggregate for last 30 days
 CALL refresh_continuous_aggregate('meter_hourly',
     NOW() - INTERVAL '30 days', NOW());

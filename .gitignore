@@ -7,3 +7,4 @@ venv/
 # Downloaded/generated datasets
 data/raw/
 data/processed/
+data/model_ready/

@@ -34,6 +34,27 @@ CREATE TABLE IF NOT EXISTS meters (
 );
 
 -- ── Hourly continuous aggregate ───────────────────────────────
+CREATE MATERIALIZED VIEW IF NOT EXISTS meter_15min
+WITH (timescaledb.continuous) AS
+SELECT
+    time_bucket('15 minutes', time) AS bucket,
+    meter_id,
+    SUM(kwh)                    AS kwh_total,
+    AVG(kwh)                    AS kwh_avg,
+    MAX(kwh)                    AS kwh_max,
+    COUNT(*)                    AS reading_count
+FROM meter_readings
+GROUP BY bucket, meter_id
+WITH NO DATA;
+
+SELECT add_continuous_aggregate_policy('meter_15min',
+    start_offset => INTERVAL '1 day',
+    end_offset   => INTERVAL '15 minutes',
+    schedule_interval => INTERVAL '15 minutes',
+    if_not_exists => TRUE
+);
+
+-- ── Hourly continuous aggregate ───────────────────────────────
 CREATE MATERIALIZED VIEW IF NOT EXISTS meter_hourly
 WITH (timescaledb.continuous) AS
 SELECT

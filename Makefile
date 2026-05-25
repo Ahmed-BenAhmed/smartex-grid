@@ -1,4 +1,4 @@
-.PHONY: up down logs simulate ingest cluster train-lstm train-prophet detect download-data prepare-data load-data eda
+.PHONY: up down logs simulate ingest cluster train-lstm train-prophet detect download-data prepare-data load-data eda resample-model
 
 up:
 	docker compose up -d
@@ -44,3 +44,6 @@ load-data:
 
 eda:
 	python scripts/generate_eda.py --max-rows 500000
+
+resample-model:
+	python scripts/resample_for_model.py --freq-minutes 60
