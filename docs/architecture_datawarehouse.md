@@ -1,62 +1,41 @@
 # SmartGrid Data Warehouse Architecture
 
-Status: design / target. The current schema (`warehouse/schema.sql`) stays the
-source of truth until the migration in `docs/migration_plan_dw_v2.md` completes.
-The target schema lives in `warehouse/schema_v2.sql`.
+The warehouse schema is defined in `warehouse/schema_v2.sql`; the progressive,
+zero-downtime rollout is described in `docs/migration_plan_dw_v2.md`. Mermaid
+sources live in `docs/diagrams/dw_*.mmd` and rendered PNGs in
+`reports/dw_design/media/`.
 
 ---
 
-## 1. Current architecture (`warehouse/schema.sql`)
+## 1. Model — star / galaxy with conformed dimensions
 
-A lean **star / fact-constellation (galaxy)** layered on a **time-series engine**
-(TimescaleDB). It is *not* a snowflake — no normalized dimension hierarchies.
+A **star / fact-constellation (galaxy)** on a time-series engine (TimescaleDB):
+three fact tables share four conformed dimensions. It is **not** a snowflake — no
+normalized dimension hierarchies — which keeps joins low for read-heavy dashboards
+and ML feature pulls.
 
-| Object | Role | Grain |
-|---|---|---|
-| `meter_readings` (hypertable, 7-day chunks) | Fact | reading / meter / timestamp |
-| `meter_predictions` (hypertable) | Fact | forecast / meter / model / timestamp |
-| `anomaly_events` | Fact | one detection event |
-| `meters` (PK `meter_id`) | Dimension | one row / meter |
-| `meter_15min` / `meter_hourly` / `meter_daily` (continuous aggregates) | Rollup / OLAP layer | time-bucketed summaries |
+```mermaid
+graph TB
+    classDef dim fill:#EAF8FB,stroke:#22B8C8,color:#102A43;
+    classDef fact fill:#FFF4E6,stroke:#F08C00,color:#5C3B00;
 
-```
-                 ┌───────────────┐
-                 │    meters     │   (the only real dimension)
-                 │  dim_meter*   │
-                 └──────┬────────┘
-                        │ meter_id (not enforced)
-      ┌─────────────────┼─────────────────┐
-      ▼                 ▼                 ▼
-┌────────────┐   ┌───────────────┐  ┌────────────────┐
-│meter_read- │   │meter_predic-  │  │ anomaly_events │   ← fact constellation
-│ings (fact) │   │tions (fact)   │  │   (fact)       │
-└─────┬──────┘   └───────────────┘  └────────────────┘
-      │ time_bucket rollups
-      ▼
-┌──────────────────────────────────────────┐
-│ meter_15min / meter_hourly / meter_daily  │  ← continuous aggregates (cube)
-└──────────────────────────────────────────┘
-```
+    DM["dim_meter (SCD-2)"]:::dim
+    DS["dim_source"]:::dim
+    DD["dim_date"]:::dim
+    DMO["dim_model"]:::dim
 
-### Gaps vs a real dimensional model
-- `source` is a **degenerate dimension** (free text in the fact), not `dim_source`.
-- **No date dimension** — only `TIMESTAMPTZ`; calendar features (holiday, season, tariff window) are unavailable for ML/BI.
-- **No foreign keys / surrogate keys** — `meter_readings.meter_id` is not enforced against `meters`.
-- `meter_predictions.model` is **free text** instead of `dim_model` (name/version/hyperparams).
-- `meters` has **no SCD** — metadata changes overwrite history.
-- `anomaly_events` is not a hypertable and is unindexed; facts lack uniqueness constraints (dup risk; the detector joins on `(meter_id, time)`).
-- No native **compression / retention** policies (costly for telemetry at scale).
+    FR["fact_meter_reading<br/>(meter x time)"]:::fact
+    FP["fact_prediction<br/>(meter x model x horizon x time)"]:::fact
+    FA["fact_anomaly_event<br/>(detection)"]:::fact
 
----
-
-## 2. Target architecture
-
-Keep the time-series facts (correct for telemetry) and formalize a
-**star / galaxy with conformed dimensions**, organized in **medallion layers**.
-New objects live in a dedicated `dw` schema so `public.*` keeps working.
-
-```
-Kafka ─▶ bronze (raw, append-only) ─▶ silver (clean, typed) ─▶ gold (facts + aggregates + marts)
+    DM --> FR
+    DS --> FR
+    DD --> FR
+    DM --> FP
+    DMO --> FP
+    DM --> FA
+    DMO --> FA
+    FR -. "time_bucket" .-> CA["fact_reading_hourly<br/>(continuous aggregate)"]:::fact
 ```
 
 ### Dimensions (`dw`)
@@ -65,35 +44,55 @@ Kafka ─▶ bronze (raw, append-only) ─▶ silver (clean, typed) ─▶ gold 
 | `dim_meter` (**SCD-2**) | surrogate `meter_key`, natural `meter_id`, profile, feeder/disco, lat/lon, `valid_from/valid_to/is_current` |
 | `dim_source` | dataset origin, country, region, utility/disco |
 | `dim_date` | calendar: weekday, month, season, holiday flag, tariff period |
-| `dim_model` | model name, version, hyperparameters, training run id |
+| `dim_model` | model name, version, family, hyperparameters, training run id |
 
 ### Facts (`dw`, time-partitioned hypertables, FK → dimensions)
 | Fact | Grain |
 |---|---|
-| `fact_meter_reading` | meter × timestamp |
-| `fact_prediction` | meter × model × horizon × timestamp |
-| `fact_anomaly_event` | one detection |
+| `fact_meter_reading` | meter × timestamp — `kwh`, `is_anomaly` |
+| `fact_prediction` | meter × model × horizon × timestamp — `kwh_pred`, `kwh_lower`, `kwh_upper` |
+| `fact_anomaly_event` | one detection — `kwh_actual`, `kwh_expected`, `deviation`, `severity`, `anomaly_type` |
 
-```
-        dim_date ─┐      ┌─ dim_source
-                  ▼      ▼
-              ┌───────────────────┐
-   dim_meter ▶│ fact_meter_reading│
-      │       └───────────────────┘
-      │       ┌───────────────────┐
-      ├──────▶│  fact_prediction  │◀── dim_model
-      │       └───────────────────┘
-      │       ┌───────────────────┐
-      └──────▶│ fact_anomaly_event│
-              └───────────────────┘
-   (conformed dimensions shared across all facts = galaxy schema)
+### Entity-relationship (keys)
+```mermaid
+erDiagram
+    dim_source ||--o{ dim_meter         : "source_key"
+    dim_meter  ||--o{ fact_meter_reading : "meter_key"
+    dim_source ||--o{ fact_meter_reading : "source_key"
+    dim_date   ||--o{ fact_meter_reading : "date_key"
+    dim_meter  ||--o{ fact_prediction    : "meter_key"
+    dim_model  ||--o{ fact_prediction    : "model_key"
+    dim_meter  ||--o{ fact_anomaly_event : "meter_key"
+    dim_model  ||--o{ fact_anomaly_event : "model_key"
 ```
 
 ### Physical layer (TimescaleDB)
 - Hypertables on every fact (`time` partition, 7-day chunks).
-- **Continuous aggregates** (15 m / hourly / daily) rebuilt over `fact_meter_reading`.
+- **Continuous aggregates** (15 m / hourly / daily) over `fact_meter_reading`.
 - **Native compression** on chunks older than ~7 days; **retention** policy on raw facts.
 - Unique constraints + indexes on `(meter_key, time)` / `(meter_key, model_key, time)`.
+
+---
+
+## 2. Medallion data flow
+
+Bronze (raw) → silver (clean/typed facts + dimensions) → gold (aggregates + marts)
+separates ingestion, normalization, and serving.
+
+```mermaid
+flowchart LR
+    S1["Morocco / London<br/>Nigeria / UCI CSV"] --> K["Kafka<br/>smartgrid.meters.raw"]
+    S2["Live replay producer"] --> K
+    K --> B["Bronze<br/>raw readings"]
+    B --> FR["Silver<br/>fact_meter_reading<br/>(+ dim_meter/source/date)"]
+    FR --> CA["Gold<br/>fact_reading_hourly"]
+    FR --> ML["ML: forecast + residual MAD"]
+    ML --> FP["fact_prediction"]
+    ML --> FA["fact_anomaly_event"]
+    CA --> G["Grafana"]
+    FP --> G
+    FA --> G
+```
 
 ---
 
@@ -108,9 +107,15 @@ fewer joins and faster reads.
 dimensions or strict-normalization governance — neither applies here. It would add
 join cost for negligible storage savings.
 
-> Net: the current design is an **under-modeled star/galaxy on Timescale**; the
-> target keeps the time-series facts and adds **conformed dimensions
-> (dim_meter SCD-2, dim_source, dim_date, dim_model) + compression/retention +
-> medallion layering**. Snowflaking would be a regression for these query patterns.
+---
 
-See `docs/migration_plan_dw_v2.md` for the non-breaking, phased migration.
+## 4. Progressive rollout (zero downtime)
+
+The model is built in the dedicated `dw` schema; early phases are purely additive,
+reads switch only once parity is verified, and consumers are preserved through
+identical-column compatibility views. See `docs/migration_plan_dw_v2.md`.
+
+```mermaid
+flowchart LR
+    P0["Guardrails"] --> P1["Dimensions"] --> P2["Facts + backfill"] --> P3["Dual-write"] --> P4["Repoint reads"] --> P5["Switch to dw views"] --> P6["Cleanup"]
+```

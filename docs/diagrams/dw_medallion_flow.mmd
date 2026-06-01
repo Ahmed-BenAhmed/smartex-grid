@@ -1,0 +1,37 @@
+%% SmartGrid DW v2 — medallion data flow (bronze -> silver -> gold)
+flowchart LR
+    classDef src fill:#F1F3F5,stroke:#868E96,color:#212529;
+    classDef bronze fill:#F8E9D6,stroke:#B07A2E,color:#5C3B00;
+    classDef silver fill:#E9ECEF,stroke:#868E96,color:#212529;
+    classDef gold fill:#FFF3BF,stroke:#E0A800,color:#5C4500;
+    classDef serve fill:#E7F5FF,stroke:#1C7ED6,color:#0B3D6B;
+
+    subgraph SRC[Sources]
+        S1["Morocco / London<br/>Nigeria / UCI CSV"]:::src
+        S2["Live replay producer"]:::src
+    end
+
+    S1 --> K
+    S2 --> K
+    K["Kafka<br/>smartgrid.meters.raw"]:::bronze
+
+    subgraph BRONZE[Bronze - raw]
+        B["raw readings<br/>append-only"]:::bronze
+    end
+    subgraph SILVER[Silver - clean/typed]
+        FRr["fact_meter_reading<br/>(+ dim_meter / dim_source / dim_date)"]:::silver
+    end
+    subgraph GOLD[Gold - facts and marts]
+        CA["fact_reading_hourly<br/>continuous aggregate"]:::gold
+        FP["fact_prediction"]:::gold
+        FA["fact_anomaly_event"]:::gold
+    end
+
+    K --> B --> FRr
+    FRr --> CA
+    FRr --> ML["ML: forecast + residual MAD"]:::serve
+    ML --> FP
+    ML --> FA
+    CA --> G["Grafana dashboards"]:::serve
+    FP --> G
+    FA --> G
