@@ -23,6 +23,16 @@ La logique ML principale repose sur une evaluation reproductible a cadence 30 mi
 
 ---
 
+## Rapport du projet
+
+Le rapport complet du projet (architecture, benchmark ML, captures de demonstration) est disponible a la racine du depot:
+
+- [`smartgrid_demo_report.pdf`](smartgrid_demo_report.pdf)
+
+Les sources Typst et la version generee se trouvent dans `reports/smartgrid_demo/`.
+
+---
+
 ## Stack technique
 
 | Couche | Technologie |
