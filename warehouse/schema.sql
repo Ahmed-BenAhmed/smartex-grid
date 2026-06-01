@@ -1,6 +1,6 @@
 -- ============================================================
 -- SmartGrid — TimescaleDB Schema
--- Projet 16: Energy Forecasting & Anomaly Detection
+-- Energy Forecasting & Anomaly Detection
 -- ============================================================
 
 CREATE EXTENSION IF NOT EXISTS timescaledb;
@@ -10,8 +10,12 @@ CREATE TABLE IF NOT EXISTS meter_readings (
     time        TIMESTAMPTZ     NOT NULL,
     meter_id    TEXT            NOT NULL,
     kwh         DOUBLE PRECISION NOT NULL,
-    is_anomaly  BOOLEAN         DEFAULT FALSE
+    is_anomaly  BOOLEAN         DEFAULT FALSE,
+    source      TEXT            DEFAULT 'unknown'
 );
+
+ALTER TABLE meter_readings
+    ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'unknown';
 
 -- Convert to hypertable partitioned by time (7-day chunks)
 SELECT create_hypertable('meter_readings', 'time',
@@ -25,7 +29,6 @@ CREATE INDEX IF NOT EXISTS idx_meter_readings_meter_id
 -- ── Household/meter metadata ──────────────────────────────────
 CREATE TABLE IF NOT EXISTS meters (
     meter_id    TEXT PRIMARY KEY,
-    cluster_id  INT,
     profile     TEXT,
     location    TEXT,
     lat         DOUBLE PRECISION,
@@ -91,7 +94,7 @@ GROUP BY bucket, meter_id
 WITH NO DATA;
 
 SELECT add_continuous_aggregate_policy('meter_daily',
-    start_offset => INTERVAL '2 days',
+    start_offset => INTERVAL '7 days',
     end_offset   => INTERVAL '1 day',
     schedule_interval => INTERVAL '1 hour',
     if_not_exists => TRUE

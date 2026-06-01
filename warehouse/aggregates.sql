@@ -32,10 +32,9 @@ WHERE meter_id = 'MTR_0001'
   AND bucket >= NOW() - INTERVAL '7 days'
 ORDER BY bucket;
 
--- Anomaly rate per cluster
-SELECT m.cluster_id, COUNT(*) AS anomaly_count
+-- Anomaly count per data source/profile
+SELECT ae.meter_id, COUNT(*) AS anomaly_count
 FROM anomaly_events ae
-JOIN meters m ON ae.meter_id = m.meter_id
 WHERE ae.detected_at >= NOW() - INTERVAL '30 days'
-GROUP BY m.cluster_id
+GROUP BY ae.meter_id
 ORDER BY anomaly_count DESC;

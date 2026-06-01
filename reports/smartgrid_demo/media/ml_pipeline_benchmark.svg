@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="620" viewBox="0 0 1500 620">
+  <rect width="1500" height="620" fill="#fbfaf6"/>
+  <style>
+    text { font-family: DejaVu Sans, Arial, sans-serif; fill: #14213d; }
+    .title { font-size: 44px; font-weight: 800; }
+    .step { font-size: 30px; font-weight: 800; }
+    .body { font-size: 22px; }
+    .small { font-size: 18px; fill: #485163; }
+  </style>
+  <text x="750" y="68" text-anchor="middle" class="title">Pipeline ML rigoureux SmartGrid</text>
+
+  <defs>
+    <marker id="arrow" markerWidth="14" markerHeight="14" refX="11" refY="7" orient="auto">
+      <path d="M0,0 L14,7 L0,14 Z" fill="#14213d"/>
+    </marker>
+  </defs>
+
+  <g transform="translate(52 132)">
+    <rect x="0" y="0" width="230" height="300" rx="10" fill="#ffffff" stroke="#2f80ed" stroke-width="4"/>
+    <text x="115" y="52" text-anchor="middle" class="step" fill="#2f80ed">1. Sources</text>
+    <text x="115" y="114" text-anchor="middle" class="body">Morocco</text>
+    <text x="115" y="162" text-anchor="middle" class="body">London</text>
+    <text x="115" y="210" text-anchor="middle" class="body">Nigeria</text>
+    <text x="115" y="258" text-anchor="middle" class="body">UCI</text>
+  </g>
+
+  <line x1="304" y1="282" x2="374" y2="282" stroke="#14213d" stroke-width="7" marker-end="url(#arrow)"/>
+
+  <g transform="translate(394 132)">
+    <rect x="0" y="0" width="250" height="300" rx="10" fill="#ffffff" stroke="#2d936c" stroke-width="4"/>
+    <text x="125" y="52" text-anchor="middle" class="step" fill="#2d936c">2. Préparer</text>
+    <text x="125" y="112" text-anchor="middle" class="body">schéma commun</text>
+    <text x="125" y="160" text-anchor="middle" class="body">resampling 30 min</text>
+    <text x="125" y="208" text-anchor="middle" class="body">group_by = source</text>
+    <text x="125" y="256" text-anchor="middle" class="body">rolling-origin CV</text>
+  </g>
+
+  <line x1="666" y1="282" x2="736" y2="282" stroke="#14213d" stroke-width="7" marker-end="url(#arrow)"/>
+
+  <g transform="translate(756 132)">
+    <rect x="0" y="0" width="280" height="300" rx="10" fill="#ffffff" stroke="#6f52b5" stroke-width="4"/>
+    <text x="140" y="52" text-anchor="middle" class="step" fill="#6f52b5">3. Benchmark</text>
+    <text x="140" y="104" text-anchor="middle" class="body">SeasonalNaive</text>
+    <text x="140" y="148" text-anchor="middle" class="body">Prophet default/tuned</text>
+    <text x="140" y="192" text-anchor="middle" class="body">LightGBM lags</text>
+    <text x="140" y="236" text-anchor="middle" class="body">LSTM Autoencoder</text>
+    <text x="140" y="274" text-anchor="middle" class="small">horizon 24 h = 48 pas</text>
+  </g>
+
+  <line x1="1058" y1="282" x2="1128" y2="282" stroke="#14213d" stroke-width="7" marker-end="url(#arrow)"/>
+
+  <g transform="translate(1148 132)">
+    <rect x="0" y="0" width="300" height="300" rx="10" fill="#ffffff" stroke="#d9822b" stroke-width="4"/>
+    <text x="150" y="52" text-anchor="middle" class="step" fill="#d9822b">4. Décision</text>
+    <text x="150" y="108" text-anchor="middle" class="body">résidu = réel - yhat</text>
+    <text x="150" y="156" text-anchor="middle" class="body">médiane / MAD</text>
+    <text x="150" y="204" text-anchor="middle" class="body">sweep de seuil</text>
+    <text x="150" y="252" text-anchor="middle" class="body">score ligne + événement</text>
+  </g>
+
+  <rect x="112" y="500" width="1276" height="70" rx="12" fill="#f2f6fb" stroke="#c8d2df" stroke-width="2"/>
+  <circle cx="158" cy="535" r="13" fill="#2f80ed"/>
+  <text x="185" y="543" class="small">données multi-sources</text>
+  <circle cx="405" cy="535" r="13" fill="#2d936c"/>
+  <text x="432" y="543" class="small">cadence 30 min</text>
+  <circle cx="630" cy="535" r="13" fill="#6f52b5"/>
+  <text x="657" y="543" class="small">matrice de modèles</text>
+  <circle cx="895" cy="535" r="13" fill="#d9822b"/>
+  <text x="922" y="543" class="small">résidus MAD</text>
+  <circle cx="1100" cy="535" r="13" fill="#d13c32"/>
+  <text x="1127" y="543" class="small">rapport, plots, Grafana</text>
+</svg>

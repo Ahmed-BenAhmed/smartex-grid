@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="760" viewBox="0 0 1800 760">
+  <rect width="1800" height="760" fill="#fbfaf6"/>
+  <text x="900" y="72" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="46" font-weight="700" fill="#14213d">Pipeline ML de détection d'anomalies</text>
+
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#14213d"/>
+    </marker>
+    <style>
+      .box-title { font-family: DejaVu Sans, Arial, sans-serif; font-size: 28px; font-weight: 700; }
+      .line { font-family: DejaVu Sans, Arial, sans-serif; font-size: 24px; fill: #111827; }
+      .small { font-family: DejaVu Sans, Arial, sans-serif; font-size: 21px; fill: #14213d; }
+    </style>
+  </defs>
+
+  <g transform="translate(55 150)">
+    <rect x="0" y="0" width="285" height="360" rx="22" fill="#ffffff" stroke="#2f80ed" stroke-width="4"/>
+    <text x="142.5" y="55" text-anchor="middle" class="box-title" fill="#2f80ed">1. Sources</text>
+    <text x="142.5" y="130" text-anchor="middle" class="line">Morocco</text>
+    <text x="142.5" y="180" text-anchor="middle" class="line">London</text>
+    <text x="142.5" y="230" text-anchor="middle" class="line">Nigeria</text>
+    <text x="142.5" y="280" text-anchor="middle" class="line">UCI</text>
+  </g>
+  <line x1="360" y1="330" x2="405" y2="330" stroke="#14213d" stroke-width="5" marker-end="url(#arrow)"/>
+
+  <g transform="translate(425 150)">
+    <rect x="0" y="0" width="285" height="360" rx="22" fill="#ffffff" stroke="#2d936c" stroke-width="4"/>
+    <text x="142.5" y="55" text-anchor="middle" class="box-title" fill="#2d936c">2. Prétraitement</text>
+    <text x="142.5" y="135" text-anchor="middle" class="line">nettoyage</text>
+    <text x="142.5" y="190" text-anchor="middle" class="line">resampling horaire</text>
+    <text x="142.5" y="245" text-anchor="middle" class="line">schéma commun</text>
+  </g>
+  <line x1="730" y1="330" x2="775" y2="330" stroke="#14213d" stroke-width="5" marker-end="url(#arrow)"/>
+
+  <g transform="translate(795 150)">
+    <rect x="0" y="0" width="285" height="360" rx="22" fill="#ffffff" stroke="#6b4fa3" stroke-width="4"/>
+    <text x="142.5" y="55" text-anchor="middle" class="box-title" fill="#6b4fa3">3. LSTM</text>
+    <text x="142.5" y="145" text-anchor="middle" class="line">24 h d'historique</text>
+    <text x="142.5" y="205" text-anchor="middle" class="line">prévision +1 h</text>
+    <text x="142.5" y="265" text-anchor="middle" class="line">court terme</text>
+  </g>
+  <line x1="1100" y1="330" x2="1145" y2="330" stroke="#14213d" stroke-width="5" marker-end="url(#arrow)"/>
+
+  <g transform="translate(1165 150)">
+    <rect x="0" y="0" width="285" height="360" rx="22" fill="#ffffff" stroke="#2f80ed" stroke-width="4"/>
+    <text x="142.5" y="55" text-anchor="middle" class="box-title" fill="#2f80ed">4. Prophet</text>
+    <text x="142.5" y="135" text-anchor="middle" class="line">tendance</text>
+    <text x="142.5" y="190" text-anchor="middle" class="line">saisonnalités</text>
+    <text x="142.5" y="245" text-anchor="middle" class="line">horizon 7 jours</text>
+  </g>
+  <line x1="1470" y1="330" x2="1515" y2="330" stroke="#14213d" stroke-width="5" marker-end="url(#arrow)"/>
+
+  <g transform="translate(1535 150)">
+    <rect x="0" y="0" width="225" height="360" rx="22" fill="#ffffff" stroke="#d9822b" stroke-width="4"/>
+    <text x="112.5" y="55" text-anchor="middle" class="box-title" fill="#d9822b">5. Décision</text>
+    <text x="112.5" y="125" text-anchor="middle" class="line">|réel - prévu|</text>
+    <text x="112.5" y="180" text-anchor="middle" class="line">MAD / z-score</text>
+    <text x="112.5" y="235" text-anchor="middle" class="line">seuil retenu</text>
+    <text x="112.5" y="295" text-anchor="middle" class="line" fill="#c7362f">alertes Grafana</text>
+  </g>
+
+  <g transform="translate(70 605)">
+    <rect x="0" y="0" width="1660" height="100" rx="18" fill="#f5f7fb" stroke="#b7c3d0" stroke-width="2"/>
+    <circle cx="65" cy="50" r="15" fill="#2f80ed"/>
+    <text x="95" y="58" class="small">Données multi-sources</text>
+    <circle cx="410" cy="50" r="15" fill="#2d936c"/>
+    <text x="440" y="58" class="small">Cadence unifiée</text>
+    <circle cx="715" cy="50" r="15" fill="#6b4fa3"/>
+    <text x="745" y="58" class="small">Modèles complémentaires</text>
+    <circle cx="1120" cy="50" r="15" fill="#d9822b"/>
+    <text x="1150" y="58" class="small">Décision interprétable</text>
+    <circle cx="1445" cy="50" r="15" fill="#c7362f"/>
+    <text x="1475" y="58" class="small">Visualisation Grafana</text>
+  </g>
+</svg>

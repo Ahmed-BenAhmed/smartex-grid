@@ -8,8 +8,9 @@ This file is for the next machine/agent continuing **Projet 16: prevision de con
 
 - `SmartexVR` backend/AI work is separate and handled in the `SmartexVR` repo.
 - This repo, `smartex-grid`, is the smart-grid ML project.
-- The ML completion work here is **not finished yet**.
-- The repo currently has preprocessing, EDA reports, Timescale/Kafka/Grafana scaffolding, and baseline ML scripts, but the final quantitative ML pipeline still needs to be implemented and verified.
+- The local demo stack is implemented and runnable without Docker.
+- The rigorous ML target is now a benchmark matrix: 30-minute resampling, natural `source` grouping for the demo, rolling-origin forecasting, synthetic true anomaly labels, forecast-residual MAD detection, and model comparison artifacts.
+- Prophet is the primary interpretable target model. SeasonalNaive is the deterministic baseline that always runs locally; Prophet, LightGBM, and LSTM Autoencoder are marked unavailable when optional dependencies are missing.
 
 ## What Exists
 
@@ -19,6 +20,8 @@ Useful existing files:
 - `scripts/resample_for_model.py` - creates model-ready cadence CSVs.
 - `scripts/generate_eda.py` - generates EDA reports and figures.
 - `ml/anomaly_detection.py` - CSV/offline rolling median + MAD detector, optional IsolationForest.
+- `ml/benchmark_ml.py` - CSV-first benchmark matrix runner.
+- `ml/eval_anomaly_detection.py` - evaluates detector flags against synthetic true anomaly labels; supports explicit forecast-residual mode.
 - `ml/anomaly_detector.py` - DB-backed residual anomaly detector.
 - `ml/prophet_model.py` - DB-backed Prophet training helper.
 - `ml/lstm_model.py` - LSTM scaffold.
@@ -36,59 +39,25 @@ time,meter_id,kwh,is_anomaly,source
 
 High priority:
 
-1. Add CSV-first Prophet/forecast evaluation:
-   - create `ml/train_prophet.py`
-   - support model-ready CSV input
-   - group by `meter_id` by default
-   - implement rolling-origin evaluation
-   - output WAPE metrics for one-step and 24h/forecast-horizon evaluation
-   - if Prophet is not installed, use a deterministic seasonal-naive fallback so the demo still runs
+1. Install optional ML dependencies in a controlled environment and rerun the benchmark:
+   - `prophet`, `pandas` for `prophet_default` and `prophet_tuned`
+   - `lightgbm`, `numpy` for `lightgbm_lag_features`
+   - `tensorflow`, `numpy` for `lstm_autoencoder`
 
-2. Add anomaly injection:
-   - create `ml/inject_anomalies.py`
-   - support point spikes/drops
-   - support contextual segment swaps
-   - support trend drift
-   - preserve original schema and write injected `is_anomaly=true` ground truth
+2. Replace the lightweight `prophet_tuned` placeholder with a real tuning loop:
+   - tune changepoint prior, seasonality prior, and seasonality mode
+   - keep the same rolling-origin folds and WAPE reporting
 
-3. Add anomaly evaluation:
-   - create `ml/eval_anomaly_detection.py`
-   - run existing `ml/anomaly_detection.py` or equivalent detector on injected data
-   - compute precision, recall, F1
-   - compute detection latency where timestamps allow it
-   - write report under `reports/ml/`
-
-4. Add a no-download demo path:
-   - create a small synthetic smart-meter dataset generator, or add a tiny committed fixture under `tests/fixtures/`
-   - make the ML demo runnable without large external datasets
-   - recommended Make targets:
-
-```make
-demo-data
-train-prophet-csv
-inject-anomalies
-eval-anomalies
-ml-demo
-test
-```
-
-5. Add tests:
-   - test anomaly injection marks expected ground truth
-   - test MAD detector catches injected spikes
-   - test WAPE calculation
-   - test forecast fallback works without Prophet installed
+3. Add full LightGBM and LSTM Autoencoder runners behind dependency checks.
 
 Medium priority:
 
-- Save forecast CSVs under `reports/ml/forecasts/`.
-- Save metrics JSON/Markdown under `reports/ml/`.
-- Integrate forecast residuals into anomaly detection.
+- Expand anomaly-type analysis in `reports/ml/anomaly_eval_metrics.json`.
 - Update README quickstart with the offline ML demo path.
 - Add CI later if desired.
 
 Low priority:
 
-- LSTM autoencoder anomaly baseline.
 - Optuna tuning.
 - More Grafana screenshots.
 
@@ -99,6 +68,10 @@ Prefer standard-library or light dependencies first. The current environment may
 The fastest robust path:
 
 - Use Python standard library CSV parsing for injection/eval.
+- Target 30-minute cadence:
+  - 24h horizon = 48 forecast steps
+  - `group_by=source` for the local demo
+  - rolling-origin CV uses at least 5 folds; the local benchmark uses 20 folds to provide contiguous forecast-residual coverage.
 - Keep `prophet` optional:
   - try importing `prophet`
   - if unavailable, train/evaluate a seasonal-naive baseline
@@ -120,30 +93,32 @@ Detection latency:
 
 ## Acceptance Gate
 
-Before saying ML is done, run and record:
+Before saying the rigorous local benchmark is done, run and record:
 
 ```bash
-make ml-demo
+make ml-benchmark-demo
 ```
 
 Expected artifacts:
 
 ```text
-data/model_ready/demo_meter_readings_60m.csv
-data/model_ready/demo_meter_readings_60m_injected.csv
-data/model_ready/demo_meter_readings_60m_injected_anomalies.csv
+data/model_ready/demo_meter_readings_30m.csv
+data/model_ready/demo_meter_readings_30m_injected.csv
+data/model_ready/demo_meter_readings_30m_injected_forecast_residual_anomalies.csv
 reports/ml/forecast_metrics.json
 reports/ml/anomaly_eval_metrics.json
+reports/ml/experiment_matrix.json
+reports/ml/model_comparison.md
 reports/ml/ml_demo_summary.md
+reports/ml/anomaly_threshold_sweep.svg
 ```
 
 Minimum success thresholds for the synthetic demo:
 
 ```text
-forecast WAPE: reported, no hard threshold for first baseline
-anomaly precision: >= 0.60
-anomaly recall: >= 0.60
-anomaly F1: >= 0.60
+forecast WAPE: reported per group and horizon
+anomaly Precision/Recall/F1/TP/FP/FN/TN: reported overall, by group, and by injected anomaly type
+latency: reported in samples and minutes where cadence is inferable
 ```
 
 If the real datasets are available, also run:

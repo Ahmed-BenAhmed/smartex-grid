@@ -20,7 +20,7 @@ PG_DSN = os.getenv("TIMESCALE_DSN", "postgresql://smartgrid:smartgrid@localhost:
 ROOT = Path(__file__).resolve().parents[1]
 
 INSERT_READINGS_SQL = """
-    INSERT INTO meter_readings (time, meter_id, kwh, is_anomaly)
+    INSERT INTO meter_readings (time, meter_id, kwh, is_anomaly, source)
     VALUES %s;
 """
 
@@ -38,7 +38,7 @@ def parse_bool(value: str) -> bool:
 def load_file(conn, path: Path, batch_size: int) -> int:
     inserted = 0
     meters: set[str] = set()
-    batch: list[tuple[str, str, float, bool]] = []
+    batch: list[tuple[str, str, float, bool, str]] = []
 
     with path.open("r", newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
@@ -50,7 +50,8 @@ def load_file(conn, path: Path, batch_size: int) -> int:
         with conn.cursor() as cursor:
             for row in reader:
                 meter_id = row["meter_id"]
-                batch.append((row["time"], meter_id, float(row["kwh"]), parse_bool(row["is_anomaly"])))
+                source = row.get("source") or path.stem
+                batch.append((row["time"], meter_id, float(row["kwh"]), parse_bool(row["is_anomaly"]), source))
                 meters.add(meter_id)
 
                 if len(batch) >= batch_size:

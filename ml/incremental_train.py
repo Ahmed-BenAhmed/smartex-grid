@@ -1,11 +1,10 @@
 """
-Incremental Training — Projet 16
+Incremental Training — SmartGrid
 Re-trains LSTM models on new data that arrived since the last checkpoint.
 Designed to run as a scheduled job (e.g., daily via cron or Airflow).
 """
 
 import os
-import glob
 import psycopg2
 import numpy as np
 import tensorflow as tf
@@ -19,31 +18,34 @@ EPOCHS      = int(os.getenv("INCR_EPOCHS", "5"))     # fewer epochs for incremen
 BATCH_SIZE  = int(os.getenv("BATCH_SIZE", "32"))
 
 
-def load_new_data(cluster_id: int, since_hours: int = 24):
+def safe_model_name(value: str) -> str:
+    return "".join(ch if ch.isalnum() else "_" for ch in value).strip("_").lower()
+
+
+def load_new_data(source: str, since_hours: int = 24):
     sql = """
-        SELECT mr.kwh
-        FROM meter_readings mr
-        JOIN meters m ON mr.meter_id = m.meter_id
-        WHERE m.cluster_id = %s
-          AND mr.time >= NOW() - INTERVAL '%s hours'
-        ORDER BY mr.time;
+        SELECT kwh
+        FROM meter_readings
+        WHERE source = %s
+          AND time >= NOW() - (%s * INTERVAL '1 hour')
+        ORDER BY time;
     """
     with psycopg2.connect(PG_DSN) as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (cluster_id, since_hours))
+            cur.execute(sql, (source, since_hours))
             rows = cur.fetchall()
     return np.array([r[0] for r in rows])
 
 
-def retrain_cluster(cluster_id: int) -> None:
-    path = os.path.join(MODEL_DIR, f"lstm_cluster_{cluster_id}.keras")
+def retrain_source(source: str) -> None:
+    path = os.path.join(MODEL_DIR, f"lstm_source_{safe_model_name(source)}.keras")
     if not os.path.exists(path):
-        print(f"[incr] no saved model for cluster {cluster_id}, skipping")
+        print(f"[incr] no saved model for source {source}, skipping")
         return
 
-    new_data = load_new_data(cluster_id)
+    new_data = load_new_data(source)
     if len(new_data) < WINDOW_SIZE + HORIZON:
-        print(f"[incr] not enough new data for cluster {cluster_id} ({len(new_data)} points)")
+        print(f"[incr] not enough new data for source {source} ({len(new_data)} points)")
         return
 
     scaler  = MinMaxScaler()
@@ -58,11 +60,19 @@ def retrain_cluster(cluster_id: int) -> None:
     model = tf.keras.models.load_model(path)
     model.fit(X, y, epochs=EPOCHS, batch_size=BATCH_SIZE, verbose=0)
     model.save(path)
-    print(f"[incr] cluster {cluster_id} updated → {path}")
+    print(f"[incr] source {source} updated → {path}")
 
 
 if __name__ == "__main__":
-    model_paths = glob.glob(os.path.join(MODEL_DIR, "lstm_cluster_*.keras"))
-    cluster_ids = [int(p.split("_")[-1].replace(".keras", "")) for p in model_paths]
-    for cid in cluster_ids:
-        retrain_cluster(cid)
+    sources = os.getenv("SOURCES", "")
+    if sources:
+        source_names = [item.strip() for item in sources.split(",") if item.strip()]
+    else:
+        source_names = [
+            "morocco_high_resolution",
+            "london_smart_meters",
+            "nigeria_smart_meter",
+            "uci_household_power",
+        ]
+    for source_name in source_names:
+        retrain_source(source_name)

@@ -11,8 +11,8 @@
 |---|---|
 | Ingest 15-min smart meter time-series | Kafka → TimescaleDB hypertable |
 | Data warehouse with hourly/daily granularity | TimescaleDB continuous aggregates |
-| Forecast per household cluster | LSTM (TensorFlow) + Prophet per K-Means cluster |
-| Detect abnormal consumption peaks | Z-score on model residuals → `anomaly_events` |
+| Forecast natural source/group loads | SeasonalNaive baseline + Prophet target benchmark |
+| Detect abnormal consumption peaks | Forecast residual → rolling median/MAD → anomaly flag |
 | Dashboard with load maps | Grafana (Forecast vs Actual, Anomaly table, Cluster bars) |
 | Incremental training | Daily re-train on new data, adaptive time windowing |
 
@@ -24,13 +24,33 @@
 |---|---|
 | Ingestion | **Kafka** (Confluent CP 7.6) |
 | Storage | **TimescaleDB** (PostgreSQL 16 extension) |
-| ML | **TensorFlow** (LSTM) + **Prophet** |
+| ML | **Prophet** target + SeasonalNaive baseline; LightGBM/LSTM optional research baselines |
 | Monitoring | **Prometheus** + **Grafana** |
 | Orchestration | Docker Compose (standalone) → k8s later |
 
 ---
 
 ## Quick Start
+
+Offline ML benchmark, no Docker or downloads required:
+
+```bash
+make ml-benchmark-demo
+make test
+```
+
+This generates a deterministic 30-minute demo dataset, evaluates a 24h horizon
+(48 steps) by natural `source`, injects synthetic true anomaly labels, scores
+forecast-residual MAD detection, and writes:
+
+```text
+reports/ml/forecast_metrics.json
+reports/ml/anomaly_eval_metrics.json
+reports/ml/experiment_matrix.json
+reports/ml/model_comparison.md
+```
+
+Live infrastructure path:
 
 ```bash
 # 1. Clone and configure
@@ -46,14 +66,10 @@ make simulate
 # 4. Start ingestion (Kafka → TimescaleDB)
 make ingest
 
-# 5. Cluster meters
-make cluster
+# 5. Train/evaluate forecasts
+make train-prophet-csv
 
-# 6. Train models (replace 0 with cluster ID)
-make train-lstm CLUSTER=0
-make train-prophet CLUSTER=0
-
-# 7. Run anomaly detection
+# 6. Run anomaly detection
 make detect
 ```
 
@@ -100,10 +116,13 @@ smartex-grid/
 │   ├── schema.sql
 │   └── aggregates.sql
 ├── ml/                   # All ML code
-│   ├── clustering.py       # K-Means on daily load profiles
-│   ├── lstm_model.py       # TensorFlow LSTM + adaptive windowing
-│   ├── prophet_model.py    # Facebook Prophet
-│   ├── anomaly_detector.py # Spike detection via residuals
+│   ├── benchmark_ml.py     # CSV-first benchmark matrix
+│   ├── train_prophet.py    # Rolling-origin WAPE evaluation
+│   ├── inject_anomalies.py # Synthetic true anomaly labels
+│   ├── eval_anomaly_detection.py # Forecast-residual detector metrics
+│   ├── prophet_model.py    # DB-backed Prophet helper
+│   ├── lstm_model.py       # TensorFlow LSTM research scaffold
+│   ├── anomaly_detector.py # DB-backed spike detection via residuals
 │   └── incremental_train.py# Daily re-training
 ├── grafana/              # Dashboard + datasource provisioning
 ├── prometheus/           # Scrape config

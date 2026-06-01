@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="620" viewBox="0 0 1100 620">
+  <rect width="1100" height="620" fill="#fbfaf6"/>
+  <style>
+    text { font-family: DejaVu Sans, Arial, sans-serif; fill: #14213d; }
+    .title { font-size: 30px; font-weight: 700; }
+    .subtitle { font-size: 18px; fill: #485163; }
+    .small { font-size: 15px; }
+    .value { font-size: 16px; font-weight: 700; }
+    .axis { font-size: 19px; font-weight: 700; }
+  </style>
+  <text x="550.0" y="38" text-anchor="middle" class="title">Benchmark de prévision</text>
+  <text x="550.0" y="66" text-anchor="middle" class="subtitle">Cadence 30 min, split naturel par source, horizon 24h</text>
+  <line x1="96" y1="492.0" x2="1058" y2="492.0" stroke="#d8dee9" stroke-width="1"/><text x="84" y="498.0" text-anchor="end" class="small">0.00</text><line x1="96" y1="392.0" x2="1058" y2="392.0" stroke="#d8dee9" stroke-width="1"/><text x="84" y="398.0" text-anchor="end" class="small">0.76</text><line x1="96" y1="292.0" x2="1058" y2="292.0" stroke="#d8dee9" stroke-width="1"/><text x="84" y="298.0" text-anchor="end" class="small">1.52</text><line x1="96" y1="192.0" x2="1058" y2="192.0" stroke="#d8dee9" stroke-width="1"/><text x="84" y="198.0" text-anchor="end" class="small">2.28</text><line x1="96" y1="92.0" x2="1058" y2="92.0" stroke="#d8dee9" stroke-width="1"/><text x="84" y="98.0" text-anchor="end" class="small">3.04</text>
+  <line x1="96" y1="92" x2="96" y2="492" stroke="#14213d" stroke-width="2"/>
+  <line x1="96" y1="492" x2="1058" y2="492" stroke="#14213d" stroke-width="2"/>
+  <text x="28" y="310.0" text-anchor="middle" transform="rotate(-90 28 310.0)" class="axis">WAPE horizon</text>
+  <rect x="96.0" y="475.4" width="227.0" height="16.6" fill="#2d936c" rx="5"/><text x="209.5" y="467.4" text-anchor="middle" class="value">0.126</text><text x="209.5" y="524" text-anchor="middle" class="small">seasonal naive</text><rect x="341.0" y="128.4" width="227.0" height="363.6" fill="#2f80ed" rx="5"/><text x="454.5" y="120.4" text-anchor="middle" class="value">2.763</text><text x="454.5" y="524" text-anchor="middle" class="small">prophet default</text><rect x="586.0" y="331.1" width="227.0" height="160.9" fill="#d9822b" rx="5"/><text x="699.5" y="323.1" text-anchor="middle" class="value">1.222</text><text x="699.5" y="524" text-anchor="middle" class="small">prophet tuned</text><rect x="831.0" y="482.7" width="227.0" height="9.3" fill="#8e44ad" rx="5"/><text x="944.5" y="474.7" text-anchor="middle" class="value">0.071</text><text x="944.5" y="524" text-anchor="middle" class="small">lightgbm lag features</text>
+</svg>

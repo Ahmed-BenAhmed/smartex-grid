@@ -203,8 +203,8 @@ DATASET_CONTEXT = {
         ),
         "contribution": (
             "This is the main project dataset because it has many households and enough history for "
-            "load-profile clustering, hourly and daily warehouse aggregates, LSTM/Prophet forecasting "
-            "per cluster, and Grafana load dashboards."
+            "source-level hourly and daily warehouse aggregates, LSTM/Prophet forecasting, anomaly "
+            "evaluation, and Grafana load dashboards."
         ),
     },
     "uci": {

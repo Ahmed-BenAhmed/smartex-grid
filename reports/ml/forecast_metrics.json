@@ -1,38 +1,280 @@
 {
-  "input_file": "data/model_ready/demo_meter_readings_60m.csv",
-  "group_by": "meter_id",
-  "model_requested": "seasonal_naive",
+  "input_file": "data/model_ready/demo_meter_readings_30m.csv",
+  "group_by": "source",
+  "freq_minutes": 30,
   "horizon_hours": 24,
-  "groups": [
+  "horizon_steps": 48,
+  "folds": 5,
+  "primary_model": "prophet_default",
+  "primary_forecast_file": "reports/ml/forecasts/demo_meter_readings_30m_prophet_default_forecasts.csv",
+  "models": [
     {
-      "group_key": "DEMO_METER_A",
-      "samples": 504,
-      "cadence_minutes": 60,
-      "horizon_hours": 24,
-      "horizon_steps": 24,
-      "folds_requested": 5,
-      "folds_used": 5,
-      "model_type": "seasonal_naive_fallback",
-      "wape_1_step": 0.08753757354512416,
-      "wape_horizon": 0.11870761662515342
+      "name": "seasonal_naive",
+      "family": "forecast",
+      "status": "completed",
+      "role": "minimum deterministic baseline",
+      "forecast_file": "reports/ml/forecasts/demo_meter_readings_30m_seasonal_naive_forecasts.csv",
+      "groups": [
+        {
+          "group_key": "london_smart_meters",
+          "samples": 1008,
+          "cadence_minutes": 30,
+          "horizon_hours": 24,
+          "horizon_steps": 48,
+          "folds_requested": 5,
+          "folds_used": 5,
+          "model_type": "seasonal_naive_fallback",
+          "wape_1_step": 0.08722610857483128,
+          "wape_horizon": 0.12327802703709924,
+          "model_name": "seasonal_naive"
+        },
+        {
+          "group_key": "morocco_high_resolution",
+          "samples": 1008,
+          "cadence_minutes": 30,
+          "horizon_hours": 24,
+          "horizon_steps": 48,
+          "folds_requested": 5,
+          "folds_used": 5,
+          "model_type": "seasonal_naive_fallback",
+          "wape_1_step": 0.09667858996853576,
+          "wape_horizon": 0.12290773333925985,
+          "model_name": "seasonal_naive"
+        },
+        {
+          "group_key": "nigeria_smart_meter",
+          "samples": 1008,
+          "cadence_minutes": 30,
+          "horizon_hours": 24,
+          "horizon_steps": 48,
+          "folds_requested": 5,
+          "folds_used": 5,
+          "model_type": "seasonal_naive_fallback",
+          "wape_1_step": 0.08132159496687726,
+          "wape_horizon": 0.12731805930801746,
+          "model_name": "seasonal_naive"
+        },
+        {
+          "group_key": "uci_household_power",
+          "samples": 1008,
+          "cadence_minutes": 30,
+          "horizon_hours": 24,
+          "horizon_steps": 48,
+          "folds_requested": 5,
+          "folds_used": 5,
+          "model_type": "seasonal_naive_fallback",
+          "wape_1_step": 0.1585967245680065,
+          "wape_horizon": 0.14042334588180028,
+          "model_name": "seasonal_naive"
+        }
+      ],
+      "overall": {
+        "groups": 4,
+        "forecast_rows": 960,
+        "wape_1_step": 0.09705873426184866,
+        "wape_horizon": 0.12594862426357747
+      }
     },
     {
-      "group_key": "DEMO_METER_B",
-      "samples": 504,
-      "cadence_minutes": 60,
-      "horizon_hours": 24,
-      "horizon_steps": 24,
-      "folds_requested": 5,
-      "folds_used": 5,
-      "model_type": "seasonal_naive_fallback",
-      "wape_1_step": 0.08608346632963715,
-      "wape_horizon": 0.11648090987928912
+      "name": "prophet_default",
+      "family": "forecast",
+      "status": "completed",
+      "role": "primary interpretable forecasting model",
+      "forecast_file": "reports/ml/forecasts/demo_meter_readings_30m_prophet_default_forecasts.csv",
+      "groups": [
+        {
+          "group_key": "london_smart_meters",
+          "samples": 1008,
+          "cadence_minutes": 30,
+          "horizon_hours": 24,
+          "horizon_steps": 48,
+          "folds_requested": 5,
+          "folds_used": 5,
+          "model_type": "prophet",
+          "wape_1_step": 0.05891516436529272,
+          "wape_horizon": 2.789514968340309,
+          "model_name": "prophet_default"
+        },
+        {
+          "group_key": "morocco_high_resolution",
+          "samples": 1008,
+          "cadence_minutes": 30,
+          "horizon_hours": 24,
+          "horizon_steps": 48,
+          "folds_requested": 5,
+          "folds_used": 5,
+          "model_type": "prophet",
+          "wape_1_step": 0.04940180890772795,
+          "wape_horizon": 1.7093545852940975,
+          "model_name": "prophet_default"
+        },
+        {
+          "group_key": "nigeria_smart_meter",
+          "samples": 1008,
+          "cadence_minutes": 30,
+          "horizon_hours": 24,
+          "horizon_steps": 48,
+          "folds_requested": 5,
+          "folds_used": 5,
+          "model_type": "prophet",
+          "wape_1_step": 0.06173535677854117,
+          "wape_horizon": 3.7072197387149215,
+          "model_name": "prophet_default"
+        },
+        {
+          "group_key": "uci_household_power",
+          "samples": 1008,
+          "cadence_minutes": 30,
+          "horizon_hours": 24,
+          "horizon_steps": 48,
+          "folds_requested": 5,
+          "folds_used": 5,
+          "model_type": "prophet",
+          "wape_1_step": 0.081423876159127,
+          "wape_horizon": 3.597531246611129,
+          "model_name": "prophet_default"
+        }
+      ],
+      "overall": {
+        "groups": 4,
+        "forecast_rows": 960,
+        "wape_1_step": 0.059441580168414075,
+        "wape_horizon": 2.7628175830069224
+      }
+    },
+    {
+      "name": "prophet_tuned",
+      "family": "forecast",
+      "status": "completed",
+      "role": "Prophet with tuned changepoint/seasonality priors",
+      "forecast_file": "reports/ml/forecasts/demo_meter_readings_30m_prophet_tuned_forecasts.csv",
+      "groups": [
+        {
+          "group_key": "london_smart_meters",
+          "samples": 1008,
+          "cadence_minutes": 30,
+          "horizon_hours": 24,
+          "horizon_steps": 48,
+          "folds_requested": 5,
+          "folds_used": 5,
+          "model_type": "prophet_tuned",
+          "wape_1_step": 0.05891583542507255,
+          "wape_horizon": 1.3115666165022781,
+          "model_name": "prophet_tuned"
+        },
+        {
+          "group_key": "morocco_high_resolution",
+          "samples": 1008,
+          "cadence_minutes": 30,
+          "horizon_hours": 24,
+          "horizon_steps": 48,
+          "folds_requested": 5,
+          "folds_used": 5,
+          "model_type": "prophet_tuned",
+          "wape_1_step": 0.04895074689352341,
+          "wape_horizon": 1.1662695095371451,
+          "model_name": "prophet_tuned"
+        },
+        {
+          "group_key": "nigeria_smart_meter",
+          "samples": 1008,
+          "cadence_minutes": 30,
+          "horizon_hours": 24,
+          "horizon_steps": 48,
+          "folds_requested": 5,
+          "folds_used": 5,
+          "model_type": "prophet_tuned",
+          "wape_1_step": 0.06280295814602428,
+          "wape_horizon": 1.104166691345931,
+          "model_name": "prophet_tuned"
+        },
+        {
+          "group_key": "uci_household_power",
+          "samples": 1008,
+          "cadence_minutes": 30,
+          "horizon_hours": 24,
+          "horizon_steps": 48,
+          "folds_requested": 5,
+          "folds_used": 5,
+          "model_type": "prophet_tuned",
+          "wape_1_step": 0.08252071206640967,
+          "wape_horizon": 1.313477113896277,
+          "model_name": "prophet_tuned"
+        }
+      ],
+      "overall": {
+        "groups": 4,
+        "forecast_rows": 960,
+        "wape_1_step": 0.05968162469576923,
+        "wape_horizon": 1.2223751445839617
+      }
+    },
+    {
+      "name": "lightgbm_lag_features",
+      "family": "forecast",
+      "status": "completed",
+      "role": "tree baseline with lag and calendar features",
+      "forecast_file": "reports/ml/forecasts/demo_meter_readings_30m_lightgbm_lag_features_forecasts.csv",
+      "groups": [
+        {
+          "group_key": "london_smart_meters",
+          "samples": 1008,
+          "cadence_minutes": 30,
+          "horizon_hours": 24,
+          "horizon_steps": 48,
+          "folds_requested": 5,
+          "folds_used": 5,
+          "model_type": "lightgbm_lag_features",
+          "model_name": "lightgbm_lag_features",
+          "wape_1_step": 0.133494932034264,
+          "wape_horizon": 0.08081493560896016
+        },
+        {
+          "group_key": "morocco_high_resolution",
+          "samples": 1008,
+          "cadence_minutes": 30,
+          "horizon_hours": 24,
+          "horizon_steps": 48,
+          "folds_requested": 5,
+          "folds_used": 5,
+          "model_type": "lightgbm_lag_features",
+          "model_name": "lightgbm_lag_features",
+          "wape_1_step": 0.10934706263831935,
+          "wape_horizon": 0.04623730165197941
+        },
+        {
+          "group_key": "nigeria_smart_meter",
+          "samples": 1008,
+          "cadence_minutes": 30,
+          "horizon_hours": 24,
+          "horizon_steps": 48,
+          "folds_requested": 5,
+          "folds_used": 5,
+          "model_type": "lightgbm_lag_features",
+          "model_name": "lightgbm_lag_features",
+          "wape_1_step": 0.1136644265303922,
+          "wape_horizon": 0.07299803390665328
+        },
+        {
+          "group_key": "uci_household_power",
+          "samples": 1008,
+          "cadence_minutes": 30,
+          "horizon_hours": 24,
+          "horizon_steps": 48,
+          "folds_requested": 5,
+          "folds_used": 5,
+          "model_type": "lightgbm_lag_features",
+          "model_name": "lightgbm_lag_features",
+          "wape_1_step": 0.07053749649540494,
+          "wape_horizon": 0.09819504223881383
+        }
+      ],
+      "overall": {
+        "groups": 4,
+        "forecast_rows": 960,
+        "wape_1_step": 0.11484072535583477,
+        "wape_horizon": 0.07071274240305465
+      }
     }
-  ],
-  "overall": {
-    "groups": 2,
-    "forecast_rows": 240,
-    "wape_1_step": 0.08673118315052113,
-    "wape_horizon": 0.11747044543697845
-  }
+  ]
 }

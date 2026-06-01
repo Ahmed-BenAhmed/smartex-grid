@@ -88,6 +88,7 @@ def prophet_forecast(
     cutoff: int,
     horizon: int,
     cadence_minutes: int,
+    prophet_params: dict | None = None,
 ) -> List[float]:
     try:
         import pandas as pd
@@ -96,7 +97,14 @@ def prophet_forecast(
         raise RuntimeError(f"Prophet unavailable: {exc}") from exc
 
     train_df = pd.DataFrame({"ds": list(times[:cutoff]), "y": list(values[:cutoff])})
-    model = Prophet(daily_seasonality=True, weekly_seasonality=True, yearly_seasonality=False)
+    params = {
+        "daily_seasonality": True,
+        "weekly_seasonality": True,
+        "yearly_seasonality": False,
+    }
+    if prophet_params:
+        params.update(prophet_params)
+    model = Prophet(**params)
     model.fit(train_df)
     future = model.make_future_dataframe(periods=horizon, freq=f"{cadence_minutes}min", include_history=False)
     forecast = model.predict(future)
@@ -126,10 +134,17 @@ def evaluate_group(
     model_used = model
 
     for fold_idx, cutoff in enumerate(cutoffs, start=1):
-        if model == "prophet" or model == "auto":
+        if model in {"prophet", "prophet_tuned", "auto"}:
             try:
-                preds = prophet_forecast(times, values, cutoff, horizon, cadence)
-                model_used = "prophet"
+                prophet_params = None
+                if model == "prophet_tuned":
+                    prophet_params = {
+                        "changepoint_prior_scale": 0.03,
+                        "seasonality_prior_scale": 5.0,
+                        "seasonality_mode": "additive",
+                    }
+                preds = prophet_forecast(times, values, cutoff, horizon, cadence, prophet_params=prophet_params)
+                model_used = "prophet_tuned" if model == "prophet_tuned" else "prophet"
             except Exception:
                 preds = seasonal_naive_forecast(values, cutoff, horizon, season_steps)
                 model_used = "seasonal_naive_fallback"
@@ -201,7 +216,7 @@ def main() -> None:
     parser.add_argument("--group-by", default="meter_id", help="Natural group column (default: meter_id)")
     parser.add_argument("--horizon-hours", type=int, default=24, help="Forecast horizon in hours")
     parser.add_argument("--folds", type=int, default=5, help="Rolling-origin folds")
-    parser.add_argument("--model", choices=["auto", "prophet", "seasonal_naive"], default="auto")
+    parser.add_argument("--model", choices=["auto", "prophet", "prophet_tuned", "seasonal_naive"], default="auto")
     parser.add_argument("--metrics-out", default=str(REPORT_DIR / "forecast_metrics.json"))
     args = parser.parse_args()
 

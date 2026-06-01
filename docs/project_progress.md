@@ -2,7 +2,7 @@
 
 ## Goal
 
-Build a smart-grid pipeline that ingests public energy datasets, normalizes them into a shared schema, stores them in TimescaleDB, and uses them for clustering, forecasting, and anomaly detection.
+Build a smart-grid pipeline that ingests public energy datasets, normalizes them into a shared schema, stores them in TimescaleDB, and uses natural source/group splits for forecasting and anomaly detection.
 
 ## Canonical Schema
 
@@ -59,7 +59,8 @@ time,meter_id,kwh,is_anomaly,source
 ## Resampling
 
 - Added `scripts/resample_for_model.py`
-- Produces hourly model-ready CSVs in `data/model_ready/`
+- Produces model-ready CSVs in `data/model_ready/`
+- The rigorous ML benchmark standardizes on 30-minute cadence, so the 24h horizon is 48 forecast steps.
 - Writes matching metadata JSON per output
 
 ## TimescaleDB Changes
@@ -73,9 +74,11 @@ time,meter_id,kwh,is_anomaly,source
 
 ## ML Pipeline
 
-- `ml/clustering.py` updated to fall back to local CSVs if TimescaleDB is unavailable
-- DB updates are optional; cluster assignments can be written locally
-- Prophet and LSTM still depend on the Python ML stack and DB access, so they are the next candidates for offline fallback
+- The main ML story uses natural grouping, not clustering.
+- `ml/train_prophet.py` provides CSV-first rolling-origin forecasting with WAPE and an optional Prophet path.
+- `ml/benchmark_ml.py` writes the benchmark matrix across SeasonalNaive, Prophet, LightGBM, and LSTM Autoencoder entries.
+- `ml/inject_anomalies.py` injects synthetic true anomaly labels: point spike/drop, contextual segment swap, and sustained trend drift.
+- `ml/eval_anomaly_detection.py` evaluates forecast-residual MAD flags against synthetic labels with Precision/Recall/F1, confusion counts, anomaly-type breakdowns, and latency.
 
 ## Documentation Updated
 
@@ -88,11 +91,11 @@ time,meter_id,kwh,is_anomaly,source
 ## Current Blockers
 
 - Docker daemon is not reachable in this session, so TimescaleDB ingestion cannot be run here
-- The local Python environment is missing some ML packages such as `scikit-learn`, so clustering cannot execute end-to-end in this session
+- The local Python environment is intentionally dependency-light; optional benchmark models are marked unavailable when `prophet`, `lightgbm`, `tensorflow`, `pandas`, or `numpy` are missing.
 
 ## Recommended Next Steps
 
-1. Add offline CSV fallbacks to `ml/prophet_model.py` and `ml/lstm_model.py`
-2. Run clustering on the local model-ready files
-3. Start Docker and ingest the processed CSVs into TimescaleDB
-4. Refresh continuous aggregates and run anomaly detection
+1. Run `make ml-benchmark-demo` and archive the generated `reports/ml/` artifacts.
+2. Install optional ML dependencies in a reproducible environment and rerun the matrix.
+3. Implement real Prophet tuning and LightGBM/LSTM runners behind the existing dependency checks.
+4. Start Docker and ingest the processed CSVs into TimescaleDB for the live dashboard proof.

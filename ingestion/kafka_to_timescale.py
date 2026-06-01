@@ -15,8 +15,8 @@ KAFKA_GROUP   = os.getenv("KAFKA_GROUP",    "timescale-sink")
 PG_DSN        = os.getenv("TIMESCALE_DSN",  "postgresql://smartgrid:smartgrid@localhost:5432/smartgrid")
 
 INSERT_SQL = """
-    INSERT INTO meter_readings (time, meter_id, kwh, is_anomaly)
-    VALUES (%s, %s, %s, %s)
+    INSERT INTO meter_readings (time, meter_id, kwh, is_anomaly, source)
+    VALUES (%s, %s, %s, %s, %s)
     ON CONFLICT DO NOTHING;
 """
 
@@ -36,7 +36,16 @@ def main() -> None:
     print(f"[consumer] listening on {KAFKA_TOPIC}")
     for msg in consumer:
         r = msg.value
-        cursor.execute(INSERT_SQL, (r["timestamp"], r["meter_id"], r["kwh"], r["is_anomaly"]))
+        cursor.execute(
+            INSERT_SQL,
+            (
+                r["timestamp"],
+                r["meter_id"],
+                r["kwh"],
+                r.get("is_anomaly", False),
+                r.get("source", "kafka_live_replay"),
+            ),
+        )
         conn.commit()
 
 

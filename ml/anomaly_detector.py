@@ -1,5 +1,5 @@
 """
-Anomaly Detector — Projet 16
+Anomaly Detector — SmartGrid
 Detects consumption spikes by comparing actual readings
 against LSTM/Prophet predictions. Writes events to TimescaleDB.
 """

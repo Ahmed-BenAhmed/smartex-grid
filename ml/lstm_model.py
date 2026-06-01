@@ -1,6 +1,6 @@
 """
-LSTM Forecasting Model — Projet 16
-Trains one LSTM per cluster on historical 15-min readings.
+LSTM Forecasting Model — SmartGrid
+Trains one LSTM per source/profile on historical 15-min readings.
 Uses adaptive time windowing and supports incremental training.
 """
 
@@ -20,17 +20,20 @@ BATCH_SIZE   = int(os.getenv("BATCH_SIZE", "32"))
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 
-def load_cluster_data(cluster_id: int) -> pd.DataFrame:
+def safe_model_name(value: str) -> str:
+    return "".join(ch if ch.isalnum() else "_" for ch in value).strip("_").lower()
+
+
+def load_source_data(source: str) -> pd.DataFrame:
     sql = """
-        SELECT mr.time, mr.kwh
-        FROM meter_readings mr
-        JOIN meters m ON mr.meter_id = m.meter_id
-        WHERE m.cluster_id = %s
-          AND mr.time >= NOW() - INTERVAL '90 days'
-        ORDER BY mr.time;
+        SELECT time, kwh
+        FROM meter_readings
+        WHERE source = %s
+          AND time >= NOW() - INTERVAL '90 days'
+        ORDER BY time;
     """
     with psycopg2.connect(PG_DSN) as conn:
-        df = pd.read_sql(sql, conn, params=(cluster_id,))
+        df = pd.read_sql(sql, conn, params=(source,))
     return df
 
 
@@ -69,11 +72,11 @@ def adaptive_window(series: np.ndarray, base_window: int = 96) -> int:
     return base_window
 
 
-def train(cluster_id: int) -> None:
-    print(f"[lstm] training cluster {cluster_id}")
-    df      = load_cluster_data(cluster_id)
+def train(source: str) -> None:
+    print(f"[lstm] training source {source}")
+    df      = load_source_data(source)
     if df.empty:
-        print(f"[lstm] no data for cluster {cluster_id}, skipping")
+        print(f"[lstm] no data for source {source}, skipping")
         return
 
     scaler  = MinMaxScaler()
@@ -86,12 +89,12 @@ def train(cluster_id: int) -> None:
     model   = build_model(window, HORIZON)
     model.fit(X, y, epochs=EPOCHS, batch_size=BATCH_SIZE, validation_split=0.1, verbose=1)
 
-    path    = os.path.join(MODEL_DIR, f"lstm_cluster_{cluster_id}.keras")
+    path    = os.path.join(MODEL_DIR, f"lstm_source_{safe_model_name(source)}.keras")
     model.save(path)
     print(f"[lstm] saved → {path}")
 
 
 if __name__ == "__main__":
     import sys
-    cluster_id = int(sys.argv[1]) if len(sys.argv) > 1 else 0
-    train(cluster_id)
+    source_name = sys.argv[1] if len(sys.argv) > 1 else os.getenv("SOURCE", "morocco_high_resolution")
+    train(source_name)

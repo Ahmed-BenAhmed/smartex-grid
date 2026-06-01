@@ -16,6 +16,7 @@ import csv
 import json
 import random
 from collections import defaultdict
+from datetime import datetime, timedelta
 from pathlib import Path
 from statistics import mean, pstdev
 from typing import Dict, List, Tuple
@@ -29,6 +30,10 @@ def bool_value(value: str) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "y"}
 
 
+def parse_time(value: str) -> datetime:
+    return datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+
+
 def read_rows(path: Path) -> Tuple[List[dict], List[str]]:
     with path.open("r", newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
@@ -38,6 +43,10 @@ def read_rows(path: Path) -> Tuple[List[dict], List[str]]:
         fieldnames.append("is_anomaly")
         for row in rows:
             row["is_anomaly"] = "false"
+    if "anomaly_type" not in fieldnames:
+        fieldnames.append("anomaly_type")
+        for row in rows:
+            row["anomaly_type"] = ""
     return rows, fieldnames
 
 
@@ -62,8 +71,13 @@ def series_std(rows: List[dict], indices: List[int]) -> float:
     return pstdev(values) if len(values) > 1 else 0.0
 
 
-def mark(row: dict) -> None:
+def mark(row: dict, anomaly_type: str) -> None:
     row["is_anomaly"] = "true"
+    existing = row.get("anomaly_type", "").strip()
+    if not existing:
+        row["anomaly_type"] = anomaly_type
+    elif anomaly_type not in {part.strip() for part in existing.split("+")}:
+        row["anomaly_type"] = f"{existing}+{anomaly_type}"
 
 
 def inject_point(rows: List[dict], indices: List[int], rng: random.Random, report: list, spike_k: float, drop_factor: float) -> None:
@@ -79,33 +93,65 @@ def inject_point(rows: List[dict], indices: List[int], rng: random.Random, repor
     else:
         rows[row_idx]["kwh"] = f"{original + spike_k * std:.8f}"
         kind = "point_spike"
-    mark(rows[row_idx])
+    mark(rows[row_idx], kind)
     report.append({"type": kind, "start_index": row_idx, "end_index": row_idx, "time": rows[row_idx]["time"]})
 
 
 def inject_contextual_swap(rows: List[dict], indices: List[int], rng: random.Random, report: list, segment_steps: int) -> None:
+    """Swap normal night and afternoon segments.
+
+    This creates contextual anomalies: each swapped value can be globally
+    plausible, but it is wrong for its time-of-day context.
+    """
     if len(indices) < segment_steps * 3:
         return
-    late_start = len(indices) * 3 // 4
-    first_start = rng.randrange(late_start, max(late_start + 1, len(indices) - (segment_steps * 3)))
-    second_start = min(first_start + segment_steps * 2, len(indices) - segment_steps)
-    first = indices[first_start : first_start + segment_steps]
-    second = indices[second_start : second_start + segment_steps]
+    by_time = {parse_time(rows[idx]["time"]): idx for idx in indices}
+    days = sorted({parse_time(rows[idx]["time"]).date() for idx in indices})
+    candidate_segments = []
+    sorted_times = sorted(by_time)
+    cadence = None
+    for prev, cur in zip(sorted_times, sorted_times[1:]):
+        delta = int((cur - prev).total_seconds() // 60)
+        if delta > 0:
+            cadence = delta
+            break
+    cadence = cadence or 30
+    for day in days[len(days) // 2 :]:
+        night_start = datetime.combine(day, datetime.min.time()).replace(hour=2)
+        day_start = datetime.combine(day, datetime.min.time()).replace(hour=14)
+        night = []
+        afternoon = []
+        for step in range(segment_steps):
+            night_time = night_start + timedelta(minutes=cadence * step)
+            day_time = day_start + timedelta(minutes=cadence * step)
+            if night_time in by_time and day_time in by_time:
+                night.append(by_time[night_time])
+                afternoon.append(by_time[day_time])
+        if len(night) == segment_steps and len(afternoon) == segment_steps:
+            candidate_segments.append((night, afternoon))
+    if not candidate_segments:
+        return
+    # Keep the deterministic demo anomalies inside the final validation horizon.
+    # Earlier candidates are useful for ad-hoc experiments, but the benchmark
+    # report scores forecast-covered rows only.
+    first, second = candidate_segments[-1]
     first_values = [rows[idx]["kwh"] for idx in first]
     second_values = [rows[idx]["kwh"] for idx in second]
     for idx, value in zip(first, second_values):
         rows[idx]["kwh"] = value
-        mark(rows[idx])
+        mark(rows[idx], "contextual_day_night_swap")
     for idx, value in zip(second, first_values):
         rows[idx]["kwh"] = value
-        mark(rows[idx])
+        mark(rows[idx], "contextual_day_night_swap")
     report.append(
         {
-            "type": "contextual_segment_swap",
-            "first_start_index": first[0],
-            "first_end_index": first[-1],
-            "second_start_index": second[0],
-            "second_end_index": second[-1],
+            "type": "contextual_day_night_swap",
+            "night_start_index": first[0],
+            "night_end_index": first[-1],
+            "afternoon_start_index": second[0],
+            "afternoon_end_index": second[-1],
+            "night_start_time": rows[first[0]]["time"],
+            "afternoon_start_time": rows[second[0]]["time"],
             "segment_steps": segment_steps,
         }
     )
@@ -114,14 +160,16 @@ def inject_contextual_swap(rows: List[dict], indices: List[int], rng: random.Ran
 def inject_trend_drift(rows: List[dict], indices: List[int], rng: random.Random, report: list, drift_steps: int, drift_percent: float) -> None:
     if len(indices) < drift_steps * 2:
         return
-    start_local = rng.randrange(len(indices) * 4 // 5, len(indices) - drift_steps + 1)
+    # Put the drift near the end of the series so rolling-origin forecast
+    # artifacts contain the full degradation window.
+    start_local = max(0, len(indices) - drift_steps)
     drift_indices = indices[start_local : start_local + drift_steps]
     baseline = mean(float(rows[idx]["kwh"]) for idx in indices)
     max_delta = baseline * drift_percent
     for step, idx in enumerate(drift_indices, start=1):
         original = float(rows[idx]["kwh"])
         rows[idx]["kwh"] = f"{original + max_delta * (step / drift_steps):.8f}"
-        mark(rows[idx])
+        mark(rows[idx], "trend_drift")
     report.append(
         {
             "type": "trend_drift",
@@ -165,11 +213,11 @@ def main() -> None:
     parser.add_argument("--out", help="Output injected CSV path")
     parser.add_argument("--group-by", default="meter_id")
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--point-per-group", type=int, default=2)
-    parser.add_argument("--segment-steps", type=int, default=4)
-    parser.add_argument("--drift-steps", type=int, default=12)
-    parser.add_argument("--spike-k", type=float, default=8.0)
-    parser.add_argument("--drift-percent", type=float, default=0.30)
+    parser.add_argument("--point-per-group", type=int, default=5)
+    parser.add_argument("--segment-steps", type=int, default=6)
+    parser.add_argument("--drift-steps", type=int, default=6)
+    parser.add_argument("--spike-k", type=float, default=10.0)
+    parser.add_argument("--drift-percent", type=float, default=0.50)
     args = parser.parse_args()
 
     input_path = Path(args.input)
@@ -185,6 +233,8 @@ def main() -> None:
 
     for row in rows:
         row["is_anomaly"] = "true" if bool_value(row.get("is_anomaly", "false")) else "false"
+        if not bool_value(row["is_anomaly"]):
+            row["anomaly_type"] = ""
     report = inject_anomalies(
         rows,
         group_by=args.group_by,

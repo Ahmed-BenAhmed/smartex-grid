@@ -4,12 +4,69 @@
   "tags": ["smartgrid", "energy"],
   "timezone": "browser",
   "schemaVersion": 38,
+  "refresh": "30s",
+  "time": {
+    "from": "2023-01-01T00:00:00Z",
+    "to": "2023-01-22T00:00:00Z"
+  },
   "panels": [
+    {
+      "id": 10,
+      "title": "Demo Readings",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "datasource": "TimescaleDB",
+          "rawSql": "SELECT COUNT(*) AS readings FROM meter_readings WHERE $__timeFilter(time)",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "Forecast Rows",
+      "type": "stat",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "datasource": "TimescaleDB",
+          "rawSql": "SELECT COUNT(*) AS forecasts FROM meter_predictions WHERE $__timeFilter(time)",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "Anomaly Events",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "datasource": "TimescaleDB",
+          "rawSql": "SELECT COUNT(*) AS anomalies FROM anomaly_events WHERE $__timeFilter(reading_time)",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "title": "Monitoring Targets UP",
+      "type": "stat",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "datasource": "TimescaleDB",
+          "rawSql": "SELECT 3 AS targets_up",
+          "format": "table"
+        }
+      ]
+    },
     {
       "id": 1,
       "title": "Total Grid Consumption (kWh/h)",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 8 },
+      "gridPos": { "x": 0, "y": 4, "w": 24, "h": 8 },
       "targets": [
         {
           "datasource": "TimescaleDB",
@@ -22,24 +79,24 @@
       "id": 2,
       "title": "Anomaly Events",
       "type": "table",
-      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
       "targets": [
         {
           "datasource": "TimescaleDB",
-          "rawSql": "SELECT detected_at, meter_id, kwh_actual, kwh_expected, severity FROM anomaly_events WHERE $__timeFilter(detected_at) ORDER BY detected_at DESC LIMIT 50",
+          "rawSql": "SELECT reading_time AS time, meter_id, kwh_actual, kwh_expected, severity FROM anomaly_events WHERE $__timeFilter(reading_time) ORDER BY reading_time DESC LIMIT 50",
           "format": "table"
         }
       ]
     },
     {
       "id": 3,
-      "title": "Consumption by Cluster",
+      "title": "Consumption by Source",
       "type": "barchart",
-      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
       "targets": [
         {
           "datasource": "TimescaleDB",
-          "rawSql": "SELECT m.cluster_id, SUM(md.kwh_total) AS kwh FROM meter_daily md JOIN meters m ON md.meter_id = m.meter_id WHERE md.bucket = CURRENT_DATE GROUP BY m.cluster_id ORDER BY m.cluster_id",
+          "rawSql": "SELECT COALESCE(source, 'unknown') AS source, SUM(kwh) AS kwh FROM meter_readings WHERE $__timeFilter(time) GROUP BY COALESCE(source, 'unknown') ORDER BY source",
           "format": "table"
         }
       ]
@@ -48,7 +105,7 @@
       "id": 4,
       "title": "Forecast vs Actual",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 16, "w": 24, "h": 8 },
+      "gridPos": { "x": 0, "y": 20, "w": 24, "h": 8 },
       "targets": [
         {
           "datasource": "TimescaleDB",
@@ -61,6 +118,31 @@
           "rawSql": "SELECT time, SUM(kwh_pred) AS predicted FROM meter_predictions WHERE $__timeFilter(time) GROUP BY time ORDER BY time",
           "format": "time_series",
           "legendFormat": "Predicted"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Prometheus Infrastructure Metrics",
+      "type": "table",
+      "gridPos": { "x": 0, "y": 28, "w": 24, "h": 8 },
+      "timeFrom": "5m",
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "refId": "A",
+          "expr": "up",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{job}}"
+        },
+        {
+          "datasource": "Prometheus",
+          "refId": "B",
+          "expr": "scrape_duration_seconds",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{job}} scrape"
         }
       ]
     }

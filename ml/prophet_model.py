@@ -1,7 +1,7 @@
 """
-Prophet Forecasting Model — Projet 16
+Prophet Forecasting Model — SmartGrid
 Alternative to LSTM: uses Facebook Prophet for trend + seasonality.
-Run per cluster on daily aggregated data.
+Runs per source/profile on daily aggregated data.
 """
 
 import os
@@ -15,28 +15,31 @@ MODEL_DIR  = os.getenv("MODEL_DIR", "./models")
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 
-def load_cluster_daily(cluster_id: int) -> pd.DataFrame:
+def safe_model_name(value: str) -> str:
+    return "".join(ch if ch.isalnum() else "_" for ch in value).strip("_").lower()
+
+
+def load_source_daily(source: str) -> pd.DataFrame:
     sql = """
         SELECT
-            md.bucket   AS ds,
-            SUM(md.kwh_total) AS y
-        FROM meter_daily md
-        JOIN meters m ON md.meter_id = m.meter_id
-        WHERE m.cluster_id = %s
-        GROUP BY md.bucket
-        ORDER BY md.bucket;
+            time_bucket('1 day', time) AS ds,
+            SUM(kwh) AS y
+        FROM meter_readings
+        WHERE source = %s
+        GROUP BY ds
+        ORDER BY ds;
     """
     with psycopg2.connect(PG_DSN) as conn:
-        df = pd.read_sql(sql, conn, params=(cluster_id,))
+        df = pd.read_sql(sql, conn, params=(source,))
     df["ds"] = pd.to_datetime(df["ds"])
     return df
 
 
-def train(cluster_id: int, forecast_days: int = 7) -> pd.DataFrame:
-    print(f"[prophet] training cluster {cluster_id}")
-    df = load_cluster_daily(cluster_id)
+def train(source: str, forecast_days: int = 7) -> pd.DataFrame:
+    print(f"[prophet] training source {source}")
+    df = load_source_daily(source)
     if df.empty:
-        print(f"[prophet] no data for cluster {cluster_id}, skipping")
+        print(f"[prophet] no data for source {source}, skipping")
         return pd.DataFrame()
 
     m = Prophet(
@@ -50,7 +53,7 @@ def train(cluster_id: int, forecast_days: int = 7) -> pd.DataFrame:
     future   = m.make_future_dataframe(periods=forecast_days)
     forecast = m.predict(future)
 
-    path = os.path.join(MODEL_DIR, f"prophet_cluster_{cluster_id}.pkl")
+    path = os.path.join(MODEL_DIR, f"prophet_source_{safe_model_name(source)}.pkl")
     with open(path, "wb") as f:
         pickle.dump(m, f)
     print(f"[prophet] saved → {path}")
@@ -60,6 +63,6 @@ def train(cluster_id: int, forecast_days: int = 7) -> pd.DataFrame:
 
 if __name__ == "__main__":
     import sys
-    cluster_id = int(sys.argv[1]) if len(sys.argv) > 1 else 0
-    forecast   = train(cluster_id)
+    source_name = sys.argv[1] if len(sys.argv) > 1 else os.getenv("SOURCE", "morocco_high_resolution")
+    forecast   = train(source_name)
     print(forecast.to_string())

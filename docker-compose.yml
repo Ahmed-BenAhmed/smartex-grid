@@ -53,6 +53,24 @@ services:
     networks: [grid-net]
     restart: unless-stopped
 
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:v1.7.0
+    container_name: grid-kafka-exporter
+    depends_on: [kafka]
+    command:
+      - --kafka.server=kafka:29092
+    networks: [grid-net]
+    restart: unless-stopped
+
+  timescaledb-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: grid-timescaledb-exporter
+    depends_on: [timescaledb]
+    environment:
+      DATA_SOURCE_NAME: postgresql://smartgrid:smartgrid@timescaledb:5432/smartgrid?sslmode=disable
+    networks: [grid-net]
+    restart: unless-stopped
+
   grafana:
     image: grafana/grafana:11.3.0
     container_name: grid-grafana
@@ -62,6 +80,8 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER:     ${GRAFANA_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED:  "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
       GF_USERS_ALLOW_SIGN_UP:     "false"
       TIMESCALE_USER:             ${TIMESCALE_USER:-smartgrid}
       TIMESCALE_PASSWORD:         ${TIMESCALE_PASSWORD:-smartgrid}

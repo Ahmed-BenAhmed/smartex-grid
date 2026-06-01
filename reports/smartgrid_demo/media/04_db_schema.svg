@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760">
+  <rect width="1200" height="760" fill="#fbfaf6"/>
+  <style>
+    text { font-family: DejaVu Sans, Arial, sans-serif; fill: #14213d; }
+    .title { font-size: 34px; font-weight: 700; }
+    .box { fill: #f7f3ff; stroke: #6b46c1; stroke-width: 2; rx: 8; }
+    .head { font-size: 20px; font-weight: 700; }
+    .field { font-size: 16px; }
+    .edge { stroke: #263238; stroke-width: 2.2; fill: none; marker-end: url(#arrow); }
+    .label { font-size: 14px; fill: #40505a; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#263238"/>
+    </marker>
+  </defs>
+  <text x="600" y="48" text-anchor="middle" class="title">Schéma TimescaleDB SmartGrid</text>
+
+  <rect x="80" y="130" width="260" height="260" class="box"/>
+  <text x="210" y="164" text-anchor="middle" class="head">meter_readings</text>
+  <text x="110" y="205" class="field">time timestamptz</text>
+  <text x="110" y="235" class="field">meter_id text</text>
+  <text x="110" y="265" class="field">kwh float</text>
+  <text x="110" y="295" class="field">is_anomaly bool</text>
+  <text x="110" y="325" class="field">source text</text>
+
+  <rect x="470" y="92" width="260" height="230" class="box"/>
+  <text x="600" y="126" text-anchor="middle" class="head">meters</text>
+  <text x="500" y="166" class="field">meter_id text PK</text>
+  <text x="500" y="196" class="field">profile text</text>
+  <text x="500" y="226" class="field">location text</text>
+  <text x="500" y="256" class="field">lat float</text>
+  <text x="500" y="286" class="field">lon float</text>
+
+  <rect x="470" y="440" width="260" height="220" class="box"/>
+  <text x="600" y="474" text-anchor="middle" class="head">anomaly_events</text>
+  <text x="500" y="514" class="field">detected_at timestamptz</text>
+  <text x="500" y="544" class="field">meter_id text</text>
+  <text x="500" y="574" class="field">reading_time timestamptz</text>
+  <text x="500" y="604" class="field">kwh_actual float</text>
+  <text x="500" y="634" class="field">severity text</text>
+
+  <rect x="860" y="130" width="260" height="220" class="box"/>
+  <text x="990" y="164" text-anchor="middle" class="head">meter_predictions</text>
+  <text x="890" y="204" class="field">time timestamptz</text>
+  <text x="890" y="234" class="field">meter_id text</text>
+  <text x="890" y="264" class="field">model text</text>
+  <text x="890" y="294" class="field">kwh_pred float</text>
+  <text x="890" y="324" class="field">kwh_lower / kwh_upper</text>
+
+  <rect x="80" y="500" width="260" height="180" class="box"/>
+  <text x="210" y="534" text-anchor="middle" class="head">meter_hourly / daily</text>
+  <text x="110" y="574" class="field">bucket timestamptz</text>
+  <text x="110" y="604" class="field">meter_id text</text>
+  <text x="110" y="634" class="field">kwh_total / avg / max</text>
+  <text x="110" y="664" class="field">reading_count</text>
+
+  <path d="M340 220 C390 190 420 170 470 165" class="edge"/>
+  <text x="378" y="188" class="label">belongs to</text>
+  <path d="M210 390 L210 500" class="edge"/>
+  <text x="226" y="454" class="label">roll up</text>
+  <path d="M340 300 C420 400 430 510 470 540" class="edge"/>
+  <text x="388" y="425" class="label">creates events</text>
+  <path d="M730 180 C790 180 815 190 860 212" class="edge"/>
+  <text x="770" y="168" class="label">has forecasts</text>
+  <path d="M860 310 C800 390 760 455 730 515" class="edge"/>
+  <text x="793" y="430" class="label">compared with actuals</text>
+</svg>
