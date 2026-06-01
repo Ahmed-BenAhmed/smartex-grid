@@ -63,7 +63,7 @@ Le système s'articule autour de deux contributions complémentaires:
   inset: 6pt,
   align: (left, left),
   [*Contribution*], [*Périmètre*],
-  [*Entrepôt de données* — Ahmed Benahmed], [Normalisation multi-source vers un schéma commun, modélisation dimensionnelle en étoile / galaxie, stockage TimescaleDB (hypertables, agrégats continus), couches médaillon et stratégie de déploiement progressif.],
+  [*Entrepôt de données* — Ahmed Benahmed], [Normalisation multi-source vers un schéma commun, modélisation dimensionnelle en étoile / galaxie, stockage TimescaleDB (hypertables, agrégats continus) et couches médaillon.],
   [*Intelligence artificielle* — Elwalid Aboulaakoul], [Préparation des séries, benchmark de prévision (SeasonalNaive, Prophet, LightGBM), détection d'anomalies par résidu médiane/MAD, baseline LSTM Autoencoder, évaluation précision/rappel et démonstration reproductible.],
 )
 
@@ -125,12 +125,6 @@ La couche physique TimescaleDB est exploitée pleinement: hypertables sur chaque
 
 *Flocon rejeté.* Normaliser les dimensions en hiérarchies (`compteur → localisation → ville → région`) n'est rentable que pour des dimensions très volumineuses ou redondantes — ce n'est pas le cas ici, et le flocon ajouterait du coût de jointure pour un gain de stockage négligeable.
 ]
-
-= Déploiement progressif (sans interruption)
-
-Le déploiement préserve la continuité de service à chaque étape: le modèle est construit dans un schéma `dw` dédié, les premières phases sont purement additives, et les lectures ne basculent qu'une fois la parité vérifiée, avec des vues de compatibilité aux colonnes identiques pour les consommateurs existants.
-
-#fig("media/dw_migration_phases.png", [Déploiement en sept phases. Vert = additif (aucun impact), rouge = bascule. Le service reste opérationnel pendant les phases additives, puis les consommateurs sont préservés sous forme de vues lors de la bascule.], width: 92%)
 
 #part[Partie II — Intelligence artificielle: prévision et détection d'anomalies]
 
@@ -211,4 +205,4 @@ La démonstration locale lance Kafka, Kafka UI, TimescaleDB, Prometheus, Grafana
 
 = Conclusion
 
-Le projet valide une chaîne SmartGrid cohérente de bout en bout. La partie entrepôt fournit un modèle dimensionnel solide — faits temporels et dimensions conformes — adapté à une charge analytique et déployable sans interruption. La partie IA repose sur une idée simple et vérifiable: une anomalie est un écart significatif entre la consommation observée et la consommation prévue pour la même source. Les deux contributions se rejoignent dans le même entrepôt et le même tableau de bord, de l'ingestion jusqu'à la décision.
+Le projet valide une chaîne SmartGrid cohérente de bout en bout. La partie entrepôt fournit un modèle dimensionnel solide — faits temporels et dimensions conformes — adapté à une charge analytique. La partie IA repose sur une idée simple et vérifiable: une anomalie est un écart significatif entre la consommation observée et la consommation prévue pour la même source. Les deux contributions se rejoignent dans le même entrepôt et le même tableau de bord, de l'ingestion jusqu'à la décision.

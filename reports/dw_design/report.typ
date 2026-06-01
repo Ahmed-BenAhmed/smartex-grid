@@ -38,13 +38,13 @@
   tp-number: "SmartGrid",
   module-name: "Smart Grid - Big Data et Intelligence Artificielle",
   report-title: [Conception de l'entrepôt de données#linebreak()SmartGrid (schéma en étoile)],
-  report-subtitle: "Modèle dimensionnel, couches médaillon et déploiement progressif",
+  report-subtitle: "Modèle dimensionnel et couches médaillon",
   student-name: [Elwalid Aboulaakoul#linebreak()Ahmed Benahmed],
   supervisor-label: "Encadrement",
   supervisor-name: "Pr. Hrimech",
   report-date: "1 juin 2026",
   academic-year: "2025/2026",
-  footer-note: "Conception data warehouse: dimensions conformes, faits temporels et déploiement progressif.",
+  footer-note: "Conception data warehouse: dimensions conformes et faits temporels.",
   school-logo: "media/logo_ensab.png",
   university-logo: "media/uh1.png",
 )
@@ -53,7 +53,7 @@
 
 Ce rapport présente la conception de l'entrepôt de données (data warehouse) du projet SmartGrid: un schéma en étoile / galaxie à dimensions conformes posé sur un moteur temporel (TimescaleDB), un choix adapté à de la télémétrie de compteurs intelligents.
 
-La conception repose sur quatre dimensions conformes (`dim_meter` en SCD-2, `dim_source`, `dim_date`, `dim_model`) partagées par trois tables de faits (`fact_meter_reading`, `fact_prediction`, `fact_anomaly_event`), organisées en couches médaillon bronze / argent / or. Le déploiement est conçu pour être progressif et sans interruption de service: le modèle est construit dans un schéma `dw` dédié, alimenté par rétro-remplissage puis par écriture, avant de basculer les lectures une fois la parité vérifiée.
+La conception repose sur quatre dimensions conformes (`dim_meter` en SCD-2, `dim_source`, `dim_date`, `dim_model`) partagées par trois tables de faits (`fact_meter_reading`, `fact_prediction`, `fact_anomaly_event`), organisées en couches médaillon bronze / argent / or.
 
 = Schéma en étoile / galaxie
 
@@ -106,28 +106,6 @@ Le pipeline est organisé en couches bronze (brut), argent (nettoyé/typé) et o
 *Flocon rejeté.* Normaliser les dimensions en hiérarchies (`compteur → localisation → ville → région`) n'est rentable que pour des dimensions très volumineuses ou redondantes, ou pour une gouvernance de normalisation stricte — ce n'est pas le cas ici. Le flocon ajouterait du coût de jointure pour un gain de stockage négligeable.
 ]
 
-= Déploiement progressif (sans interruption)
-
-Le déploiement est conçu pour préserver la continuité de service à chaque étape. Le modèle est construit dans un schéma `dw` dédié; les premières phases sont purement additives; les lectures ne basculent qu'une fois la parité vérifiée, et des vues de compatibilité aux colonnes identiques sont exposées aux consommateurs existants (tableaux de bord, scripts ML).
-
-#fig("media/dw_migration_phases.png", [Déploiement en sept phases. Vert = additif (aucun impact), rouge = bascule. Le service reste opérationnel pendant les phases additives, puis les consommateurs sont préservés sous forme de vues lors de la bascule.], width: 92%)
-
-#table(
-  columns: 3,
-  inset: 5pt,
-  align: (left, left, left),
-  [*Phase*], [*Action*], [*Continuité*],
-  [0 — Garde-fous], [Tag git, instantané des comptages], [Aucun changement],
-  [1 — Dimensions], [Créer `dw`, semer les dimensions], [Additif],
-  [2 — Faits], [Créer + rétro-remplir, vérifier la parité], [Additif],
-  [3 — Double écriture], [Alimenter `dw` en parallèle], [Service prioritaire],
-  [4 — Bascule lectures], [Pointer Grafana/ML sur `dw.v_*`], [Réversible],
-  [5 — Bascule], [Exposer les faits via vues `dw`], [Colonnes identiques],
-  [6 — Nettoyage], [Retirer les artefacts transitoires], [Optionnel],
-)
-
-Chaque phase possède un retour arrière en une étape. La garantie de fond: aucune opération destructive avant que la parité ne soit prouvée, et les consommateurs existants restent servis par des vues aux colonnes identiques.
-
 = Conclusion
 
-La conception proposée combine des faits temporels sur TimescaleDB et des dimensions conformes (`dim_meter` SCD-2, `dim_source`, `dim_date`, `dim_model`), avec clés et contraintes, compression/rétention et un découpage médaillon clair. Le schéma en étoile est adapté à une charge de lecture analytique, et le déploiement progressif garantit la continuité de service du pipeline.
+La conception proposée combine des faits temporels sur TimescaleDB et des dimensions conformes (`dim_meter` SCD-2, `dim_source`, `dim_date`, `dim_model`), avec clés et contraintes, compression/rétention et un découpage médaillon clair. Le schéma en étoile est adapté à une charge de lecture analytique et à l'évolution du système.
