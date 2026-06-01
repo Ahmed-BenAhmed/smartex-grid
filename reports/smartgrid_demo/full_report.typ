@@ -45,7 +45,7 @@
   student-name: [Ahmed Benahmed — Entrepôt de données#linebreak()Elwalid Aboulaakoul — Intelligence artificielle],
   supervisor-label: "Encadrement",
   supervisor-name: "Pr. Hrimech",
-  report-date: "1 juin 2026",
+  report-date: none,
   academic-year: "2025/2026",
   footer-note: "Rapport complet: conception de l'entrepôt de données et algorithmes IA de détection d'anomalies.",
   school-logo: "media/logo_ensab.png",
