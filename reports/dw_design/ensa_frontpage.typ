@@ -115,16 +115,12 @@
 
         #v(0.9cm)
 
-        #if report-date != none [
-          #grid(
-            columns: (1fr, 1fr),
-            gutter: 1.6cm,
-            [#meta-block([Date du TP], [#report-date])],
-            [#meta-block([Annee universitaire], [#academic-year])],
-          )
-        ] else [
-          #align(center)[#meta-block([Annee universitaire], [#academic-year])]
-        ]
+        #grid(
+          columns: (1fr, 1fr),
+          gutter: 1.6cm,
+          [#meta-block([Date du TP], [#report-date])],
+          [#meta-block([Annee universitaire], [#academic-year])],
+        )
       ]
     ]
 

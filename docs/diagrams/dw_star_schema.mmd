@@ -1,0 +1,24 @@
+%% SmartGrid DW v2 — star / galaxy schema (conformed dimensions shared by 3 facts)
+graph TB
+    classDef dim fill:#EAF8FB,stroke:#22B8C8,stroke-width:1.5px,color:#102A43;
+    classDef fact fill:#FFF4E6,stroke:#F08C00,stroke-width:1.5px,color:#5C3B00;
+
+    DM["dim_meter (SCD-2)<br/>meter_key PK · meter_id<br/>profile · feeder · lat/lon<br/>valid_from/to · is_current"]:::dim
+    DS["dim_source<br/>source_key PK<br/>country · region · utility"]:::dim
+    DD["dim_date<br/>date_key PK · day<br/>weekday · season · holiday · tariff"]:::dim
+    DMO["dim_model<br/>model_key PK<br/>name · version · hyperparams"]:::dim
+
+    FR["fact_meter_reading<br/>(meter x time)<br/>kwh · is_anomaly"]:::fact
+    FP["fact_prediction<br/>(meter x model x horizon x time)<br/>kwh_pred · lower · upper"]:::fact
+    FA["fact_anomaly_event<br/>(detection)<br/>actual · expected · deviation · severity"]:::fact
+
+    DM --> FR
+    DS --> FR
+    DD --> FR
+    DM --> FP
+    DMO --> FP
+    DD --> FP
+    DM --> FA
+    DMO --> FA
+
+    FR -. "time_bucket rollups" .-> CA["fact_reading_hourly<br/>(continuous aggregate / cube)"]:::fact

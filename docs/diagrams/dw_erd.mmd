@@ -1,0 +1,70 @@
+%% SmartGrid DW v2 — entity relationship (keys & columns)
+erDiagram
+    dim_source  ||--o{ dim_meter          : "source_key"
+    dim_meter   ||--o{ fact_meter_reading  : "meter_key"
+    dim_source  ||--o{ fact_meter_reading  : "source_key"
+    dim_date    ||--o{ fact_meter_reading  : "date_key"
+    dim_meter   ||--o{ fact_prediction     : "meter_key"
+    dim_model   ||--o{ fact_prediction     : "model_key"
+    dim_meter   ||--o{ fact_anomaly_event  : "meter_key"
+    dim_model   ||--o{ fact_anomaly_event  : "model_key"
+
+    dim_meter {
+        int  meter_key PK
+        text meter_id
+        int  source_key FK
+        text profile
+        text feeder
+        timestamptz valid_from
+        timestamptz valid_to
+        bool is_current
+    }
+    dim_source {
+        int  source_key PK
+        text source_code
+        text country
+        text region
+        text utility
+    }
+    dim_date {
+        int  date_key PK
+        date day
+        int  day_of_week
+        bool is_weekend
+        text season
+        bool is_holiday
+        text tariff_period
+    }
+    dim_model {
+        int  model_key PK
+        text model_name
+        text model_version
+        text family
+        jsonb hyperparams
+    }
+    fact_meter_reading {
+        timestamptz time
+        int  meter_key FK
+        int  source_key FK
+        int  date_key FK
+        float kwh
+        bool is_anomaly
+    }
+    fact_prediction {
+        timestamptz time
+        int  meter_key FK
+        int  model_key FK
+        int  horizon_steps
+        float kwh_pred
+        float kwh_lower
+        float kwh_upper
+    }
+    fact_anomaly_event {
+        timestamptz reading_time
+        int  meter_key FK
+        int  model_key FK
+        float kwh_actual
+        float kwh_expected
+        float deviation
+        text severity
+    }
