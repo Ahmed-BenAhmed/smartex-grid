@@ -35,11 +35,9 @@ Les sources Typst et la version generee se trouvent dans `reports/smartgrid_demo
 
 ## Demonstration (video)
 
-Une demonstration video de la chaine SmartGrid en execution (ingestion Kafka, stockage TimescaleDB, prevision / detection d'anomalies et dashboard Grafana) est disponible:
+Une demonstration video de la chaine SmartGrid en execution (ingestion Kafka, stockage TimescaleDB, prevision / detection d'anomalies et dashboard Grafana) est disponible sur Google Drive:
 
-- [`media/smartgrid_demo.mkv`](media/smartgrid_demo.mkv)
-
-> Format MKV — telechargez le fichier pour le lire (VLC ou equivalent).
+- [Voir la demonstration (Google Drive)](https://drive.google.com/file/d/1M7IF1hFHmYBv_MhAbWbcE_mql-akYI4V/view?usp=sharing)
 
 ---
 
