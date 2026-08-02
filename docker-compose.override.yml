@@ -1,0 +1,9 @@
+# Local-only override (not committed).
+# The base compose advertises PLAINTEXT://localhost:9092, which on this Windows
+# host resolves to ::1 first and stalls host Kafka clients (esp. the consumer's
+# group-coordinator lookup). Advertise 127.0.0.1 so host clients use IPv4.
+# Internal listener (kafka:29092) is unchanged, so kafka-ui/exporter are unaffected.
+services:
+  kafka:
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://127.0.0.1:9092,PLAINTEXT_INTERNAL://kafka:29092
